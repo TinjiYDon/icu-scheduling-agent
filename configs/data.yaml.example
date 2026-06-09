@@ -1,0 +1,10 @@
+# 复制为 configs/data.yaml
+source: mock   # mock | mimic
+phase: P0      # P0 | P1 | P2
+
+mock:
+  schema: mock
+
+mimic:
+  # 使用 database.yaml 中 layer0 的 DSN，由 ETL 按 mimic_source 选择
+  pass

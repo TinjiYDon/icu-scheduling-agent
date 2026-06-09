@@ -1,0 +1,15 @@
+lambda:
+  wait: 10.0
+  overload: 1.0
+  balance: 0.1
+
+resources:
+  n_beds: 20
+  n_isolation_beds: 4
+  n_ventilators: 8
+
+rolling:
+  step_hours: 2
+
+policy:
+  default: cp_sat   # cp_sat | ppo | hybrid
