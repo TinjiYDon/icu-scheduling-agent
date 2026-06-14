@@ -5,7 +5,17 @@
 ## 方案与状态
 
 - **当前进度**：`docs/STATUS.md`
-- **队友恢复 dump**：上级 [`../TEAM_DATA.md`](../TEAM_DATA.md)
+- **队友恢复 dump**：见下方「Docker + restore」
+
+## 队友：Docker + restore
+
+```powershell
+docker compose up -d
+.\scripts\restore_layer1.ps1 -Target scheduling -DumpFile .\dumps\icu_scheduling_layer1_schemas_xxx.dump
+copy configs\data.yaml.example configs\data.yaml
+pytest tests/ -q
+python -m application.run_p0
+```
 
 ## 快速开始
 
