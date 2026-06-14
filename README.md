@@ -5,7 +5,7 @@
 ## 方案与状态
 
 - **当前进度**：`docs/STATUS.md`
-- **队友恢复 dump**：`docs/TEAM_RESTORE.md`
+- **队友恢复 dump**：上级 [`../TEAM_DATA.md`](../TEAM_DATA.md)
 
 ## 快速开始
 

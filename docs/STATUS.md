@@ -1,29 +1,26 @@
 # 项目一 · 状态摘要
 
-> 完整团队日志：`../PROJECT_STATUS.md`  
-> **MIMIC**：下载中 · **阶段**：P0
+> 团队总览：[`../PROJECT_STATUS.md`](../PROJECT_STATUS.md)
 
-## P0 目标
+## P0 进度（Demo）
 
-ETL → SOFA → CP-SAT → 滚动仿真 → Streamlit → Layer1 dump
+| 项 | 状态 |
+|----|------|
+| ETL staging | ✓ 140 stays |
+| SOFA（24h  lab 简化） | ✓ |
+| CP-SAT 床位分配 | ✓ 20/140 分配 |
+| Layer1 dump | ✓ `../dumps/icu_scheduling_layer1_schemas_*.dump` |
 
-## 本地命令
+## 一键跑通
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\pip install -e ".[dev]"
-copy .env.example .env
-copy configs\database.yaml.example configs\database.yaml
-copy configs\data.yaml.example configs\data.yaml
 .\scripts\apply_migrations.ps1
-pytest tests/ -q
-python -m application.etl_pipeline
-streamlit run presentation/streamlit_app.py
+python -m application.run_p0
 ```
 
-## 代码待办（MIMIC 后）
+## 分步
 
-- [ ] `domain/scoring/sofa.py`
-- [ ] `domain/optimizer/cp_sat.py`
-- [ ] `domain/simulation/replay.py`
-- [ ] PPO stub → 完整
+```powershell
+python -m application.etl_pipeline
+python -m application.simulate
+```
