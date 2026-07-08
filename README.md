@@ -1,6 +1,8 @@
 # ICU 医疗资源动态调度智能体
 
-独立开源项目 · 仓库 [icu-scheduling-agent](https://github.com/TinjiYDon/icu-scheduling-agent) · 数据库 `icu_scheduling`
+独立开源项目 · 3 人协作 · 仓库 [icu-scheduling-agent](https://github.com/TinjiYDon/icu-scheduling-agent)
+
+**协作入口**：[`docs/COLLABORATION.md`](docs/COLLABORATION.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md) · [`docs/BACKLOG.md`](docs/BACKLOG.md)
 
 ## 快速开始
 
