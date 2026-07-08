@@ -5,7 +5,8 @@ database:
 
 # Layer 0 只读源（MIMIC 导入完成后填写）
 layer0:
-  mimic_source: demo   # demo | full
+  mimic_source: demo   # demo | full | mimic
   demo_dsn: "postgresql+psycopg://icu_dev:CHANGE_ME@localhost:5432/mimic_iv_demo"
   full_dsn: "postgresql+psycopg://icu_dev:CHANGE_ME@localhost:5432/mimic_iv"
+  mimic_dsn: "postgresql+psycopg://icu_dev:CHANGE_ME@localhost:5432/mimic"
   waveform_dsn: "postgresql+psycopg://icu_dev:CHANGE_ME@localhost:5432/mimic_iv_waveform"

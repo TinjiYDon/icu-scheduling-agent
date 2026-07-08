@@ -1,26 +1,18 @@
 # 项目一 · 状态摘要
 
-> 团队总览：[`../PROJECT_STATUS.md`](../PROJECT_STATUS.md)
+> 最后更新：2026-07-08
 
-## P0 进度（Demo）
+## 数据检查点（已完成）
 
 | 项 | 状态 |
 |----|------|
-| ETL staging | ✓ 140 stays |
-| SOFA（24h  lab 简化） | ✓ |
-| CP-SAT 床位分配 | ✓ 20/140 分配 |
-| Layer1 dump | ✓ `../dumps/icu_scheduling_layer1_schemas_*.dump` |
+| ETL staging | ✓ 94,458 |
+| dump | ✓ `icu_scheduling_P0-etl_mimic_94458stays_20260708.dump` |
+| 冒烟 | ✓ `run_data_pipeline.ps1` |
 
-## 一键跑通
+## 模型阶段（下一步）
 
-```powershell
-.\scripts\apply_migrations.ps1
-python -m application.run_p0
-```
-
-## 分步
-
-```powershell
-python -m application.etl_pipeline
-python -m application.simulate
-```
+| 项 | 状态 |
+|----|------|
+| SOFA + CP-SAT 全量 | 待 `application.simulate` |
+| Streamlit | 占位 |

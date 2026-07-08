@@ -1,36 +1,29 @@
 # ICU 医疗资源动态调度智能体
 
-项目一 · 仓库 `icu-scheduling-agent` · PostgreSQL `icu_scheduling`
+仓库：[icu-scheduling-agent](https://github.com/TinjiYDon/icu-scheduling-agent) · 数据库：`icu_scheduling`
 
-## 方案与状态
+## 文档
 
-- **当前进度**：`docs/STATUS.md`
-- **队友恢复 dump**：见下方「Docker + restore」
+**从 [`docs/PROJECT_GUIDE.md`](docs/PROJECT_GUIDE.md) 开始。**
 
-## 队友：Docker + restore
+## 当前阶段
 
-```powershell
-docker compose up -d
-.\scripts\restore_layer1.ps1 -Target scheduling -DumpFile .\dumps\icu_scheduling_layer1_schemas_xxx.dump
-copy configs\data.yaml.example configs\data.yaml
-pytest tests/ -q
-python -m application.run_p0
-```
-
-## 快速开始
+数据检查点 ✓（ETL 94,458 + dump + 冒烟）· 下一步：CP-SAT 仿真
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\pip install -e ".[dev]"
-copy .env.example .env
-copy configs\database.yaml.example configs\database.yaml
-copy configs\data.yaml.example configs\data.yaml
-.\scripts\apply_migrations.ps1
-pytest tests/ -q
-python -m application.etl_pipeline
-streamlit run presentation/streamlit_app.py
+$env:PYTHONPATH = (Get-Location)
+.\scripts\run_data_pipeline.ps1
+python -m application.simulate
 ```
 
 ## 架构
 
-L5 Streamlit → L4 application → L3 domain (SOFA / CP-SAT / PPO) → L2 data_access → L1 infra → PostgreSQL
+```
+Layer0 mimic → ETL → SOFA → CP-SAT/PPO → Streamlit
+```
+
+## Docker
+
+```powershell
+docker compose up -d   # PG 端口 5434
+```

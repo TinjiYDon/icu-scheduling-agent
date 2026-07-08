@@ -37,7 +37,9 @@ def count_icustays() -> int:
         with _mock_engine().connect() as conn:
             return conn.execute(text("SELECT COUNT(*) FROM mock.icustays")).scalar_one()
     with _read_engine().connect() as conn:
-        return conn.execute(text("SELECT COUNT(*) FROM mimiciv_icu.icustays")).scalar_one()
+        return conn.execute(
+            text("SELECT COUNT(DISTINCT stay_id) FROM mimiciv_icu.icustays")
+        ).scalar_one()
 
 
 def fetch_icustays() -> list[dict[str, Any]]:
@@ -54,11 +56,12 @@ def fetch_icustays() -> list[dict[str, Any]]:
         """
     else:
         sql = """
-            SELECT stay_id, subject_id, hadm_id,
+            SELECT DISTINCT ON (stay_id)
+                   stay_id, subject_id, hadm_id,
                    first_careunit, last_careunit,
                    intime, outtime, los AS los_hours
             FROM mimiciv_icu.icustays
-            ORDER BY stay_id
+            ORDER BY stay_id, intime
         """
     with _read_engine().connect() as conn:
         rows = conn.execute(text(sql)).mappings().all()
