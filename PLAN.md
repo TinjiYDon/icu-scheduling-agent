@@ -1,7 +1,9 @@
-# 项目一：ICU 医疗资源动态调度智能体
+# ICU 医疗资源动态调度智能体
 
-> 目录：`icu-scheduling/` · 仓库：`icu-scheduling-agent`  
-> 数据库：`icu_scheduling`（PostgreSQL 16，独立实例）
+> 仓库：`icu-scheduling-agent`  
+> 数据库：`icu_scheduling`（PostgreSQL 16）
+
+本仓库**独立运行**：自带 ETL、优化仿真与演示，不依赖其他 ICU 项目或共享 MCP 服务。
 
 ---
 
@@ -14,7 +16,7 @@
 
 **不做什么**
 
-- 不调用项目二 API，不读 `icu_decision` 库。
+- 不依赖其他 ICU 项目的数据库、API 或 MCP 服务。
 
 **输入 / 输出**
 

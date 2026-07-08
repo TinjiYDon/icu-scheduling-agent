@@ -1,4 +1,4 @@
--- Layer 1 schema（P0）项目一 icu_scheduling
+-- Layer 1 schema (P0) for icu_scheduling
 CREATE SCHEMA IF NOT EXISTS staging;
 CREATE SCHEMA IF NOT EXISTS feat;
 CREATE SCHEMA IF NOT EXISTS sim;
