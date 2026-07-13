@@ -4,8 +4,8 @@
 
 | 任务 | 文件 | 状态 |
 |------|------|------|
-| L4 方案查询 | `application/plan.py` | ✅ `get_plan` / `run_simulation_with_plan` |
-| Streamlit 演示 | `presentation/streamlit_app.py` | ✅ 仿真 → 分配表 |
+| L4 方案查询 | `application/plan.py` + `data_access/assignments_repo.py` | ✅ SQL 下沉 |
+| Streamlit 演示 | `presentation/streamlit_app.py` | ✅ 目标分解 + 空态 |
 | 测试 | `tests/test_plan.py` | ✅ smoke |
 
 ## 待完成

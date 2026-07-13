@@ -21,13 +21,13 @@
 
 ## 成员 C 本阶段交付
 
-- `application/plan.py`
-- `presentation/streamlit_app.py`
+- `application/plan.py` + `data_access/assignments_repo.py`
+- `presentation/streamlit_app.py`（目标分解 + 空态/not_found）
+
+## 验证
 
 ```powershell
 $env:PYTHONPATH = (Get-Location)
-.\scripts\run_data_pipeline.ps1
-python -m application.simulate
+pytest tests/test_plan.py tests/test_smoke.py -q
 streamlit run presentation/streamlit_app.py
-pytest tests/test_plan.py -q
 ```
