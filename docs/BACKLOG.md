@@ -16,19 +16,18 @@
 
 ---
 
-## S2 · CP-SAT 仿真
+## S3 · Streamlit
 
-- [ ] **#S2-1** B：`domain/optimizer/cp_sat.py` 20 床 demo  
-- [ ] **#S2-2** B：`application/simulate.py` 端到端  
-  - 验证：`python -m application.simulate`  
-  - 测试：`tests/test_simulate.py`
+- [x] **#S3-1** C：`presentation/streamlit_app.py` 展示状态 → 分配方案 ✅
+  - L4：`application/plan.py` · 只调 L4
 
 ---
 
-## S3 · Streamlit
+## S2 · CP-SAT 仿真（B + C）
 
-- [ ] **#S3-1** C：展示状态输入 → 分配方案 → 目标分解  
-  - 只调 L4
+- [ ] **#S2-1** B：`domain/optimizer/cp_sat.py` 20 床 demo（已有，待指标完善）
+- [ ] **#S2-2** B：`application/simulate.py` 端到端
+- [x] **#S2-3** C：`application/plan.py` 方案 JSON + Streamlit 联调 ✅
 
 ---
 

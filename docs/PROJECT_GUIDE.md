@@ -35,12 +35,15 @@ $env:PYTHONPATH = (Get-Location)
 .\scripts\run_data_pipeline.ps1
 ```
 
-### 3. 仿真阶段（下一步）
+### 3. 仿真与演示（成员 C 骨架 ✅）
 
 ```powershell
 python -m application.simulate
 python -m application.run_p0
+streamlit run presentation/streamlit_app.py
 ```
+
+L4：`run_simulation_with_plan()` · `get_plan()` — 见 [`docs/TODO_OWNER.md`](TODO_OWNER.md)
 
 ### 从已有 dump 恢复
 
@@ -53,8 +56,8 @@ python -m application.run_p0
 
 | 阶段 | 状态 |
 |------|------|
-| ETL + dump + 冒烟 | **当前终点** |
-| CP-SAT / PPO | 下一步 |
+| ETL + dump + 冒烟 | **已完成** |
+| CP-SAT + Streamlit | C 骨架 ✅ · B 指标待完善 |
 
 ## dump 命名
 
@@ -64,7 +67,7 @@ python -m application.run_p0
 
 | 项 | 位置 |
 |----|------|
-| Streamlit | `presentation/streamlit_app.py` |
+| CP-SAT 指标 / 目标分解 | B · `domain/optimizer/` |
 | PPO | `domain/optimizer/` |
 | MCP Tool | `docs/INNOVATION_ROADMAP.md` |
 
