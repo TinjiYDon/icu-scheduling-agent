@@ -7,6 +7,14 @@ resources:
   n_beds: 20
   n_isolation_beds: 4
   n_ventilators: 8
+  max_patients: 200   # 候选患者上限 = n_beds × 10
+  # 床位分区: (起始号, 数量, 标签)
+  bed_zones:
+    - [1, 4, "ISO"]
+    - [5, 4, "MICU"]
+    - [9, 4, "SICU"]
+    - [13, 4, "CCU"]
+    - [17, 4, "NICU"]
 
 rolling:
   step_hours: 2

@@ -8,20 +8,18 @@
 
 ## 里程碑
 
-| 阶段 | 目标 | 交付物 |
-|------|------|--------|
-| **P0** ✓ | Demo 跑通 | ETL + SOFA + CP-SAT |
-| **P1** | 可解释 Demo | Streamlit 方案页 + 约束说明 |
-| **P2** | 标准接口 | MCP Tool `optimize_beds(state)` |
-| **P3** | 学习型策略 | PPO + 仿真环境 |
-| **P4** | 多目标扩展 | 等待时间、负荷均衡等可插拔目标 |
+| 阶段 | 目标 | 交付物 | 状态 |
+|------|------|--------|:--:|
+| **P0** | Demo 跑通 | ETL + 合成SOFA + CP-SAT | ✅ |
+| **P1** | 可解释 Demo | Streamlit 方案页 + 约束说明 | 🔄 |
+| **P2** | 标准接口 | MCP Tool `optimize_beds(state)` | ⏳ |
+| **P3** | 学习型策略 | PPO + 仿真环境 | ⏳ |
+| **P4** | 多目标扩展 | 等待时间、负荷均衡等可插拔目标 | ⏳ |
 
-## 扩展方向
-
-- **MCP**：对外暴露 `optimize_beds`，供任意 Agent 客户端调用
-- **容器化**：调度服务 + 配置热更新
+> 注：P0 SOFA 目前使用合成数据（基于 stay_id 哈希），真实 MIMIC lab 评分待 Layer0 数据库就绪后替换。
 
 ## 当前重点
 
-1. Streamlit 展示分配方案与 SOFA 分布
-2. MCP Tool schema（输入 state，输出 plan + explanation）
+1. Streamlit 展示分配方案与滚动仿真结果
+2. 连接 MIMIC 源库，替换合成 SOFA 为真实评分
+3. MCP Tool schema（输入 state，输出 plan + explanation）
