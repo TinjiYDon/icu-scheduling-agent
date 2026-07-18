@@ -2,6 +2,8 @@ lambda:
   wait: 10.0
   overload: 1.0
   balance: 0.1
+  # 原模型中科室不匹配每例固定惩罚 50；0.5 × 100 保持该默认强度。
+  zone_mismatch: 0.5
 
 resources:
   n_beds: 20
@@ -21,3 +23,18 @@ rolling:
 
 policy:
   default: cp_sat   # cp_sat | ppo | hybrid
+
+ppo:
+  candidate_patients: 20
+  training_pool_patients: 200
+  invalid_action_penalty: 10.0
+  wait_action_penalty: 1.0
+  seed: 42
+  learning_rate: 0.0003
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  batch_size: 64
+  n_steps: 256
+  total_timesteps: 200000
+  model_path: artifacts/ppo_icu

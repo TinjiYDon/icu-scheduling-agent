@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import uuid
 import hashlib
+import math
+from typing import Mapping
 
 from ortools.sat.python import cp_model
 from sqlalchemy import text
@@ -41,8 +43,57 @@ def _needs_ventilator(stay_id: int) -> bool:
     return int(h[:8], 16) % 100 < 35
 
 
-def run_assignment(run_id: str | None = None) -> dict:
+_LAMBDA_DEFAULTS = {
+    "wait": 10.0,
+    "overload": 1.0,
+    "balance": 0.1,
+    "zone_mismatch": 0.5,
+}
+
+
+def _resolve_lambda_weights(
+    configured: Mapping[str, object] | None,
+    overrides: Mapping[str, float] | None = None,
+) -> dict[str, float]:
+    """Merge and validate objective weights used by CP-SAT experiments."""
+    weights = dict(_LAMBDA_DEFAULTS)
+    if configured:
+        unknown = set(configured) - set(weights)
+        if unknown:
+            raise ValueError(f"unknown lambda weight(s): {', '.join(sorted(unknown))}")
+        weights.update(configured)
+    if overrides:
+        unknown = set(overrides) - set(weights)
+        if unknown:
+            raise ValueError(f"unknown lambda weight(s): {', '.join(sorted(unknown))}")
+        weights.update(overrides)
+
+    resolved: dict[str, float] = {}
+    for name, raw_value in weights.items():
+        value = float(raw_value)
+        if not math.isfinite(value) or value < 0:
+            raise ValueError(f"lambda.{name} must be a finite non-negative number")
+        resolved[name] = value
+    if not any(resolved.values()):
+        raise ValueError("at least one lambda weight must be greater than zero")
+    return resolved
+
+
+def _objective_coefficient(weight: float, scale: int = 100) -> int:
+    """Convert a lambda to an integer CP-SAT coefficient without losing positives."""
+    if weight == 0:
+        return 0
+    return max(1, round(weight * scale))
+
+
+def run_assignment(
+    run_id: str | None = None,
+    lambda_weights: Mapping[str, float] | None = None,
+    *,
+    persist: bool = True,
+) -> dict:
     opt = load_yaml("optimizer.yaml")
+    lam = _resolve_lambda_weights(opt.get("lambda", {}), lambda_weights)
     n_beds = int(opt.get("resources", {}).get("n_beds", 20))
     n_iso_beds = int(opt.get("resources", {}).get("n_isolation_beds", 4))
     n_vents = int(opt.get("resources", {}).get("n_ventilators", 8))
@@ -85,7 +136,24 @@ def run_assignment(run_id: str | None = None) -> dict:
     stays = [dict(r) for r in rows]
     n = len(stays)
     if n == 0:
-        return {"run_id": run_id, "assigned": 0, "n_beds": n_beds}
+        return {
+            "run_id": run_id,
+            "assigned": 0,
+            "n_beds": n_beds,
+            "n_stays": 0,
+            "lambda": lam,
+            "status": "empty",
+            "evaluation": {
+                "assignment_rate": 0.0,
+                "priority_total": 0.0,
+                "avg_assigned_priority": 0.0,
+                "high_risk_assigned_rate": 1.0,
+                "overload_penalty": 0,
+                "balance_deviation": 0,
+                "zone_match_rate": 0.0,
+                "solve_time_seconds": 0.0,
+            },
+        }
 
     # Derive patient attributes
     iso_flags = [False] * n
@@ -132,10 +200,10 @@ def run_assignment(run_id: str | None = None) -> dict:
         model.Add(sum(vent_assigned) <= n_vents)
 
     # ── 3. Multi-objective ────────────────────────────────────────
-    lam = opt.get("lambda", {})
-    w_wait = float(lam.get("wait", 10.0))
-    w_over = float(lam.get("overload", 1.0))
-    w_bal = float(lam.get("balance", 0.1))
+    w_wait = lam["wait"]
+    w_over = lam["overload"]
+    w_bal = lam["balance"]
+    w_zone = lam["zone_mismatch"]
 
     # f₁: maximize priority_weight (minimize wait for high-risk patients)
     f1 = sum(weights[i] * x[i, b] for i in range(n) for b in range(n_beds))
@@ -186,7 +254,7 @@ def run_assignment(run_id: str | None = None) -> dict:
         # Mismatch only if: assigned somewhere AND NOT in pref zone AND NOT in ISO
         mismatch = model.NewIntVar(0, 1, f"mismatch_{i}")
         model.Add(mismatch >= assigned_anywhere - in_pref_zone - in_iso)
-        mismatch_terms.append(mismatch * 50)
+        mismatch_terms.append(mismatch)
 
     if mismatch_terms:
         model.Add(zone_mismatch_penalty == sum(mismatch_terms))
@@ -195,10 +263,10 @@ def run_assignment(run_id: str | None = None) -> dict:
 
     # Combined objective
     model.Maximize(
-        int(w_wait * 100) * f1
-        - int(w_over * 100) * overload_penalty
-        - int(w_bal * 100) * max_dev
-        - zone_mismatch_penalty
+        _objective_coefficient(w_wait) * f1
+        - _objective_coefficient(w_over) * overload_penalty
+        - _objective_coefficient(w_bal) * max_dev
+        - _objective_coefficient(w_zone) * zone_mismatch_penalty
     )
 
     # ── 4. Solve ──────────────────────────────────────────────────
@@ -231,20 +299,25 @@ def run_assignment(run_id: str | None = None) -> dict:
                     "needs_vent": vent_flags[i],
                 })
 
-    # Write to DB
-    with engine.begin() as conn:
-        conn.execute(
-            text("DELETE FROM sched.assignments WHERE run_id = :run_id"),
-            {"run_id": run_id},
-        )
-        for a in assignments:
+    # Tuning runs should not fill the production assignment table.
+    if persist:
+        with engine.begin() as conn:
             conn.execute(
-                text(
-                    "INSERT INTO sched.assignments (run_id, stay_id, bed_id) "
-                    "VALUES (:run_id, :stay_id, :bed_id)"
-                ),
-                {"run_id": run_id, "stay_id": a["stay_id"], "bed_id": a["bed_id"]},
+                text("DELETE FROM sched.assignments WHERE run_id = :run_id"),
+                {"run_id": run_id},
             )
+            for a in assignments:
+                conn.execute(
+                    text(
+                        "INSERT INTO sched.assignments (run_id, stay_id, bed_id) "
+                        "VALUES (:run_id, :stay_id, :bed_id)"
+                    ),
+                    {
+                        "run_id": run_id,
+                        "stay_id": a["stay_id"],
+                        "bed_id": a["bed_id"],
+                    },
+                )
 
     # ── 6. Explainable output ─────────────────────────────────────
     f1_val = sum(
@@ -263,6 +336,10 @@ def run_assignment(run_id: str | None = None) -> dict:
     n_vent_used = sum(1 for a in assignments if a["needs_vent"])
     n_zone_match = sum(1 for a in assignments if a.get("zone_match"))
     zone_mismatch_val = solver.Value(zone_mismatch_penalty)
+    high_risk_total = sum(1 for s in stays if float(s["sofa_total"]) >= 10)
+    high_risk_assigned = sum(1 for a in assignments if float(a["sofa_total"]) >= 10)
+    assigned_priority_total = sum(float(a["priority_weight"]) for a in assignments)
+    assigned_count = len(assignments)
 
     return {
         "run_id": run_id,
@@ -270,12 +347,31 @@ def run_assignment(run_id: str | None = None) -> dict:
         "n_beds": n_beds,
         "n_stays": n,
         "solver_status": "OPTIMAL" if status == cp_model.OPTIMAL else "FEASIBLE",
+        "lambda": lam,
         "objective": {
             "f1_priority_total": f1_val,
             "f2_overload_penalty": f2_val,
             "f3_balance_deviation": balance_dev,
             "f4_zone_mismatch": zone_mismatch_val,
             "zone_loads": zone_vals,
+        },
+        # These business metrics are independent of lambda coefficients, so
+        # results from different tuning runs can be compared directly.
+        "evaluation": {
+            "assignment_rate": round(assigned_count / n, 4),
+            "priority_total": round(assigned_priority_total, 4),
+            "avg_assigned_priority": round(
+                assigned_priority_total / assigned_count, 4
+            ) if assigned_count else 0.0,
+            "high_risk_assigned_rate": round(
+                high_risk_assigned / high_risk_total, 4
+            ) if high_risk_total else 1.0,
+            "overload_penalty": f2_val,
+            "balance_deviation": balance_dev,
+            "zone_match_rate": round(
+                n_zone_match / assigned_count, 4
+            ) if assigned_count else 0.0,
+            "solve_time_seconds": round(solver.WallTime(), 4),
         },
         "resources": {
             "isolation_beds_used": f"{n_iso_used}/{n_iso_beds}",
