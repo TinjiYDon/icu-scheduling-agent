@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import random
-import hashlib
-from collections import defaultdict
 
 from sqlalchemy import text
 

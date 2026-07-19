@@ -58,4 +58,11 @@ def test_lambda_rejects_all_zero():
 
 def test_small_positive_lambda_keeps_nonzero_coefficient():
     assert _objective_coefficient(0) == 0
-    assert _objective_coefficient(0.001) == 1
+    assert _objective_coefficient(0.001) > 0
+
+
+def test_objective_coefficient_normalizes_raw_magnitude():
+    priority = _objective_coefficient(1.0, upper_bound=20_000)
+    balance = _objective_coefficient(1.0, upper_bound=20)
+
+    assert priority * 20_000 == balance * 20

@@ -6,9 +6,6 @@ and objective decomposition — no SHAP dependency.
 
 from __future__ import annotations
 
-from typing import Any
-
-
 def explain_assignment(result: dict) -> str:
     """Generate a human-readable explanation from a CP-SAT run result.
 
@@ -114,8 +111,6 @@ def explain_assignment(result: dict) -> str:
     lines.append("─" * 50)
 
     n_assigned = result.get("assigned", 0)
-    n_beds = result.get("n_beds", 1)
-
     bindings = _analyze_constraints(result)
     for label, bind, detail in bindings:
         status = "▇ 绑定" if bind else "○ 松弛"
@@ -172,7 +167,7 @@ def _analyze_constraints(result: dict) -> list[tuple[str, bool, str]]:
         min_z = min(zones)
         bind = (max_z - min_z) <= 1
         bindings.append(
-            ("区域均衡", bind, f"max-min={max_z-min_z}" if not bind else f"均衡 (max-min=0)")
+            ("区域均衡", bind, f"max-min={max_z-min_z}" if not bind else "均衡 (max-min=0)")
         )
 
     return bindings

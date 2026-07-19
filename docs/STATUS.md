@@ -99,3 +99,19 @@ python -m application.train_ppo
 python -m application.run_ppo
 python -m application.evaluate_ppo
 ```
+
+## 2026-07-19 · Python 环境恢复后的首次验证
+
+### 验证结果
+
+- Python 3.12.10、标准库、pip 和项目 `.venv` 已恢复；λ/PPO 依赖安装完成。
+- 新增 λ/PPO 单元测试及 PPO 短训练测试实测 `28 passed`。
+- Ruff 静态检查通过，Gymnasium 官方 `check_env` 通过。
+- MaskablePPO 已完成 256 步内存合成场景训练与确定性推理冒烟：分配 9 人，总奖励 190.5。
+- 新增自动化短训练测试 `tests/test_ppo_training_smoke.py`。
+
+### λ 目标缩放修正
+
+- 发现原始 `f1` 使用 x1000 优先级，而均衡项通常只有个位数，原始量纲会让部分 λ 调整失效。
+- 四个目标现按理论上界归一到共同整数尺度后再乘 λ；求解结果新增 `objective_scaling.bounds/coefficients` 方便审计。
+- 当前基线 λ 仍未在真实数据上定稿；本机没有 Docker、`configs/database.yaml` 或可用 PostgreSQL 数据，真实网格实验仍待数据环境恢复。

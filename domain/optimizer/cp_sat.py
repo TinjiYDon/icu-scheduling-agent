@@ -79,11 +79,19 @@ def _resolve_lambda_weights(
     return resolved
 
 
-def _objective_coefficient(weight: float, scale: int = 100) -> int:
-    """Convert a lambda to an integer CP-SAT coefficient without losing positives."""
+def _objective_coefficient(
+    weight: float, upper_bound: int = 1, scale: int = 1_000_000
+) -> int:
+    """Normalize an objective to a shared integer scale for CP-SAT.
+
+    The raw objectives have very different magnitudes (priority is stored at
+    x1000 while balance is usually single digits).  Dividing the common scale
+    by each objective's upper bound makes lambda values represent relative
+    preference instead of accidental unit size.
+    """
     if weight == 0:
         return 0
-    return max(1, round(weight * scale))
+    return max(1, round(weight * scale / max(int(upper_bound), 1)))
 
 
 def run_assignment(
@@ -111,7 +119,6 @@ def run_assignment(
             bed_zone_label[b] = label
         bed_zone_start[label] = start
         bed_zone_count[label] = count
-    zone_list = [z[2] for z in bed_zones_cfg]  # ["ISO", "MICU", ...]
     run_id = run_id or f"p0_{uuid.uuid4().hex[:8]}"
 
     # ── 1. Load patients ──────────────────────────────────────────
@@ -200,11 +207,6 @@ def run_assignment(
         model.Add(sum(vent_assigned) <= n_vents)
 
     # ── 3. Multi-objective ────────────────────────────────────────
-    w_wait = lam["wait"]
-    w_over = lam["overload"]
-    w_bal = lam["balance"]
-    w_zone = lam["zone_mismatch"]
-
     # f₁: maximize priority_weight (minimize wait for high-risk patients)
     f1 = sum(weights[i] * x[i, b] for i in range(n) for b in range(n_beds))
 
@@ -262,11 +264,21 @@ def run_assignment(
         model.Add(zone_mismatch_penalty == 0)
 
     # Combined objective
+    objective_bounds = {
+        "wait": max(1, n_beds * max(weights, default=1)),
+        "overload": max(1, n_beds * max(sofa_vals, default=1)),
+        "balance": max(1, n_beds),
+        "zone_mismatch": max(1, n_beds),
+    }
+    objective_coefficients = {
+        name: _objective_coefficient(lam[name], objective_bounds[name])
+        for name in lam
+    }
     model.Maximize(
-        _objective_coefficient(w_wait) * f1
-        - _objective_coefficient(w_over) * overload_penalty
-        - _objective_coefficient(w_bal) * max_dev
-        - _objective_coefficient(w_zone) * zone_mismatch_penalty
+        objective_coefficients["wait"] * f1
+        - objective_coefficients["overload"] * overload_penalty
+        - objective_coefficients["balance"] * max_dev
+        - objective_coefficients["zone_mismatch"] * zone_mismatch_penalty
     )
 
     # ── 4. Solve ──────────────────────────────────────────────────
@@ -329,7 +341,6 @@ def run_assignment(
         for b in range(n_iso_beds, n_beds)
     )
     zone_vals = [solver.Value(zl) for zl in zone_load_vars]
-    avg = sum(zone_vals) / 4
     balance_dev = solver.Value(max_dev)
 
     n_iso_used = sum(1 for a in assignments if a["bed_type"] == "ISO")
@@ -348,6 +359,10 @@ def run_assignment(
         "n_stays": n,
         "solver_status": "OPTIMAL" if status == cp_model.OPTIMAL else "FEASIBLE",
         "lambda": lam,
+        "objective_scaling": {
+            "bounds": objective_bounds,
+            "coefficients": objective_coefficients,
+        },
         "objective": {
             "f1_priority_total": f1_val,
             "f2_overload_penalty": f2_val,
