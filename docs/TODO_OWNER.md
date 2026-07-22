@@ -12,8 +12,9 @@
 
 | 任务 | 说明 |
 |------|------|
-| MCP `optimize_beds` | S4 · P2 |
-| PPO 进阶 | S4 · B 主责 |
+| MCP `optimize_beds` | ✅ 骨架 · `python -m presentation.mcp_server` |
+| PPO 进阶 | S4 · B 主责 · Draft PR #3 |
+| Bugbot | Dashboard Enable · `docs/BUGBOT.md` |
 
 ## 验证
 

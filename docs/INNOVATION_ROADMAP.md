@@ -26,5 +26,5 @@
 1. Streamlit 展示分配方案与 SOFA/目标约束说明
 2. B：SOFA→feat + simulate 指标（Issue #4）
 3. Draft PR #3：仅审；PPO 留分支直至数据底座（方案 B）就绪
-4. MCP Tool schema（P2）
+4. MCP `optimize_beds` 骨架已合（`presentation/mcp_tools.py`）
 

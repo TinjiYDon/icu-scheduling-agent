@@ -34,8 +34,8 @@
 
 ## S4 · 进阶
 
-- [ ] **#S4-1** B：PPO stub（P3）  
-- [ ] **#S4-2** C：MCP `optimize_beds`（P2）
+- [ ] **#S4-1** B：PPO stub（P3 · 保持 Draft PR #3）  
+- [x] **#S4-2** C：MCP `optimize_beds`（骨架 ✅ 2026-07-22）
 
 ---
 
