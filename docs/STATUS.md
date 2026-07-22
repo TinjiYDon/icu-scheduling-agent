@@ -19,7 +19,7 @@
 | MCP Tool `optimize_beds` | ✅ C 骨架（`presentation/mcp_server.py`） |
 | Draft PR #3 lambda+PPO | 审查中 · **保持 Draft** · PPO 不合 main |
 | MCP（完整联调） | P2+ · 骨架已合 |
-| Bugbot | ⏳ 见 `docs/BUGBOT.md`（Dashboard 待开） |
+| Bugbot | ✅ 已开（2026-07-22 · Dashboard Enable 三仓） |
 
 ## 成员 C 本阶段交付
 

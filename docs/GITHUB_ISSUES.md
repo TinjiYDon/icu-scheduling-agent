@@ -10,5 +10,5 @@
 | [#4](https://github.com/TinjiYDon/icu-scheduling-agent/issues/4) | S1/S2 SOFA+simulate（B） | 🔔 已催 |
 | [#5](https://github.com/TinjiYDon/icu-scheduling-agent/issues/5) | S1-2 ETL/dump（A） | 🔔 已催 |
 
-S4 MCP `optimize_beds` 骨架 ✅ C · Bugbot 见 `docs/BUGBOT.md`（Dashboard 待开）  
+S4 MCP `optimize_beds` 骨架 ✅ C · Bugbot ✅ 已开（2026-07-22）  
 RL：B 数据底座 + A审 PR#3；PPO 不合 main
