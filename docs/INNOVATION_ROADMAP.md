@@ -23,5 +23,8 @@
 
 ## 当前重点
 
-1. Streamlit 展示分配方案与 SOFA 分布
-2. MCP Tool schema（输入 state，输出 plan + explanation）
+1. Streamlit 展示分配方案与 SOFA/目标约束说明
+2. B：SOFA→feat + simulate 指标（Issue #4）
+3. Draft PR #3：仅审；PPO 留分支直至数据底座（方案 B）就绪
+4. MCP Tool schema（P2）
+
