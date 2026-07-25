@@ -13,3 +13,8 @@ rolling:
 
 policy:
   default: cp_sat   # cp_sat | ppo | hybrid
+
+# Wave1: calib tunes params; eval is report-only (do NOT retune on eval)
+eval_split:
+  calib_ratio: 0.7
+  seed: 42

@@ -14,11 +14,17 @@ ICU stays → SOFA/优先级 → CP-SAT 分床 → `sched.assignments` → Strea
 | B | SOFA / CP-SAT /（预研 PPO） |
 | C | L4 `plan` + Streamlit |
 
+## 先读
+
+1. `docs/ROADMAP_EXEC.md`
+2. `docs/PARAM_STORY.md`
+3. `docs/STATUS.md`
+
 ## 命令
 
 ```powershell
 $env:PYTHONPATH = (Get-Location)
-.\.venv\Scripts\python.exe -m pytest tests/test_plan.py tests/test_smoke.py tests/test_mcp_optimize.py -q
+.\.venv\Scripts\python.exe -m pytest tests/test_plan.py tests/test_smoke.py tests/test_mcp_optimize.py tests/test_simulate_metrics.py -q
 streamlit run presentation/streamlit_app.py
 .\.venv\Scripts\pip.exe install "mcp>=1.0"
 .\.venv\Scripts\python.exe -m presentation.mcp_server
@@ -27,6 +33,7 @@ streamlit run presentation/streamlit_app.py
 ## 关键契约
 
 - L4：`run_simulation_with_plan()` / `get_plan()`
+- 评估：calib/eval（`domain.optimizer.eval_split`）· **不是** train/val/test
 - MCP：`optimize_beds(run_id?)` → 同上（`presentation/mcp_tools.py`）
 - 参数故事：`docs/PARAM_STORY.md`
 - Bugbot：`docs/BUGBOT.md`

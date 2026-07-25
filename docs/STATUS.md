@@ -18,8 +18,11 @@
 | L4 `plan` / Streamlit | ✅ C |
 | MCP Tool `optimize_beds` | ✅ C 骨架（`presentation/mcp_server.py`） |
 | Draft PR #3 lambda+PPO | 审查中 · **保持 Draft** · PPO 不合 main |
+| calib/eval 骨架 | ✅ Wave1 · `eval_split` + simulate metrics |
+| SOFA→feat + STATUS 数值 | ⏳ Wave2 · B |
 | MCP（完整联调） | P2+ · 骨架已合 |
-| Bugbot | ✅ 已开（2026-07-22 · Dashboard Enable 三仓） |
+| Bugbot | ✅ 已开 |
+| 路线图 | [`ROADMAP_EXEC.md`](ROADMAP_EXEC.md) |
 
 ## 成员 C 本阶段交付
 

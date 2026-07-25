@@ -26,8 +26,9 @@
 ## S2 · CP-SAT 仿真（B + C）
 
 - [ ] **#S2-1** B：`domain/optimizer/cp_sat.py` 20 床 demo（已有，待指标完善）
-- [ ] **#S2-2** B：`application/simulate.py` 端到端
+- [ ] **#S2-2** B：`application/simulate.py` 端到端 + STATUS 数值（**Wave2**）
 - [x] **#S2-3** C：`application/plan.py` + `data_access/assignments_repo.py` ✅
+- [x] **#S2-3b** C：calib/eval 骨架 + metrics 键（**Wave1** ✅ 2026-07-25）
 - [x] **#S3-1b** Streamlit 目标分解 metrics、`not_found` 状态 ✅
 
 ---
