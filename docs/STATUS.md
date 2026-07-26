@@ -1,20 +1,20 @@
 # 项目状态
 
-> 更新：2026-07-22
+> 更新：2026-07-26
 
 ## 数据检查点（已完成）
 
 | 项 | 状态 |
 |----|------|
 | ETL staging | ✓ 94,458 stays |
-| dump | ✓ 曾导出；schemas_only 不足支撑 PPO（见 `PARAM_STORY.md`） |
+| dump | ✓ 最新仍 **20260708**；`_local-data` 重复/legacy 已清 |
 | 冒烟测试 | ✓ `run_data_pipeline.ps1` |
 
 ## 仿真阶段
 
 | 项 | 状态 |
 |----|------|
-| SOFA + CP-SAT | B 主责（Issue #4） |
+| SOFA + CP-SAT | B 主责（Issue #4）；Owner 可代跑 labs→sofa |
 | L4 `plan` / Streamlit | ✅ C |
 | MCP Tool `optimize_beds` | ✅ C 骨架（`presentation/mcp_server.py`） |
 | Draft PR #3 lambda+PPO | 审查中 · **保持 Draft** · PPO 不合 main |
