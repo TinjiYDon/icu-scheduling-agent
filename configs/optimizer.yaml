@@ -18,3 +18,7 @@ policy:
 eval_split:
   calib_ratio: 0.7
   seed: 42
+
+solver:
+  max_time_seconds: 60
+  candidate_cap: 200   # top-N stays by priority for P0 CP-SAT (full cohort too large)

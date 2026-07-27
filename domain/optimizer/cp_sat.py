@@ -30,10 +30,15 @@ def run_assignment(run_id: str | None = None) -> dict:
                 """
             )
         ).mappings().all()
-    stays = [dict(r) for r in rows]
-    n_stays = len(stays)
-    if n_stays == 0:
+    stays_all = [dict(r) for r in rows]
+    n_stays_all = len(stays_all)
+    if n_stays_all == 0:
         return {"run_id": run_id, "assigned": 0, "n_beds": n_beds}
+
+    # P0: only top candidates compete for n_beds (full 94k×beds is intractable in 30s).
+    cand_cap = int(opt.get("solver", {}).get("candidate_cap", max(n_beds * 10, 200)))
+    stays = stays_all[: min(cand_cap, n_stays_all)]
+    n_stays = len(stays)
 
     model = cp_model.CpModel()
     x: dict[tuple[int, int], cp_model.IntVar] = {}
@@ -50,7 +55,7 @@ def run_assignment(run_id: str | None = None) -> dict:
     model.Maximize(sum(weights[si] * x[si, bi] for si in range(n_stays) for bi in range(n_beds)))
 
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 30.0
+    solver.parameters.max_time_in_seconds = float(opt.get("solver", {}).get("max_time_seconds", 60.0))
     status = solver.Solve(model)
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         raise RuntimeError(f"CP-SAT failed: status={status}")
@@ -75,6 +80,7 @@ def run_assignment(run_id: str | None = None) -> dict:
         "run_id": run_id,
         "assigned": assigned,
         "n_beds": n_beds,
-        "n_stays": n_stays,
+        "n_stays": n_stays_all,
+        "n_candidates": n_stays,
         "solver_status": "OPTIMAL" if status == cp_model.OPTIMAL else "FEASIBLE",
     }
