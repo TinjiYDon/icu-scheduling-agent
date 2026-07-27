@@ -8,7 +8,8 @@
 |----|------|
 | Layer0 labevents | ✅ 158,374,764 |
 | feat.sofa_timeseries | ✅ 94,458 |
-| dump | ✅ `dumps/icu_scheduling_P0-full_mimic_94458stays_20260727.dump` |
+| dump | ✅ `dumps/icu_scheduling_P0-full_mimic_94458stays_20260727.dump` · `schemas_only=false` |
+| 交付说明 | [`DUMP_READY.md`](DUMP_READY.md) |
 | simulate | ✅ OPTIMAL · **n_candidates=1000** · assigned=20 |
 
 ## 调参 / 可视化
@@ -23,5 +24,7 @@
 ## 说明
 
 - `candidate_cap` 只限制 CP-SAT 候选，**不**裁剪 labs/SOFA/feat
-- 真 online PPO 轨迹仍归 Draft PR #3 / 成员 B
+- **dump 可支撑** CP-SAT/仿真；**不可**单独支撑 online PPO 轨迹
+- 真 online PPO 仍归 Draft PR #3 / 成员 B
+- GitHub（2026-07-27）：仅 open Draft PR #3；无新 PR 可合
 - 进度看板：`d:\project\_local-data\mimic\PROGRESS.md`
