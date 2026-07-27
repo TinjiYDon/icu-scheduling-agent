@@ -19,6 +19,7 @@ ICU stays → SOFA/优先级 → CP-SAT 分床 → `sched.assignments` → Strea
 1. `docs/ROADMAP_EXEC.md`
 2. `docs/PARAM_STORY.md`
 3. `docs/STATUS.md`
+4. `docs/TUNING_LOCAL.md` · `docs/PPO_SMOKE.md`
 
 ## 命令
 

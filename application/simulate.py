@@ -37,8 +37,32 @@ def run_simulate(*, use_eval_split: bool = True) -> dict:
         "assigned": assign.get("assigned", 0),
         "unassigned": max(int(assign.get("n_stays", 0)) - int(assign.get("assigned", 0)), 0),
         "solver_status": assign.get("solver_status"),
+        "n_candidates": assign.get("n_candidates"),
     }
     meta["status"] = "simulate_ok"
+    try:
+        from infra.config import load_yaml
+        from infra.mlflow_util import log_run
+
+        sol = load_yaml("optimizer.yaml").get("solver", {})
+        rid = log_run(
+            "icu-scheduling",
+            "simulate_cp_sat",
+            {
+                "candidate_cap": sol.get("candidate_cap"),
+                "max_time_seconds": sol.get("max_time_seconds"),
+                "n_beds": assign.get("n_beds"),
+            },
+            {
+                "assigned": float(assign.get("assigned") or 0),
+                "n_stays": float(assign.get("n_stays") or 0),
+                "n_candidates": float(assign.get("n_candidates") or 0),
+            },
+        )
+        if rid:
+            meta["mlflow_run_id"] = rid
+    except Exception as exc:  # noqa: BLE001
+        meta["mlflow_error"] = str(exc)
     return meta
 
 

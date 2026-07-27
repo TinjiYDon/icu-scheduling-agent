@@ -1,50 +1,27 @@
 ﻿# 项目状态
 
-> 更新：2026-07-27 · Owner 数据底座
+> 更新：2026-07-27 · Owner · cap=1000 · Streamlit/MLflow
 
 ## 数据
 
 | 项 | 状态 |
 |----|------|
 | Layer0 labevents | ✅ 158,374,764 |
-| feat.sofa_timeseries | ✅ 94458 |
+| feat.sofa_timeseries | ✅ 94,458 |
 | dump | ✅ `dumps/icu_scheduling_P0-full_mimic_94458stays_20260727.dump` |
-| simulate | 见下方 |
+| simulate | ✅ OPTIMAL · **n_candidates=1000** · assigned=20 |
 
-## simulate 结果
+## 调参 / 可视化
 
-```
-{
-  "sofa_rows": 94458,
-  "eval_split": {
-    "seed": 42,
-    "calib_ratio": 0.7,
-    "n_calib": 66121,
-    "n_eval": 28337,
-    "note": "Wave1 skeleton: assignment still uses full cohort; Wave2 B should restrict calib/eval runs"
-  },
-  "run_id": "p0_daf0724e",
-  "assigned": 20,
-  "n_beds": 20,
-  "n_stays": 94458,
-  "n_candidates": 200,
-  "solver_status": "OPTIMAL",
-  "metrics": {
-    "n_stays": 94458,
-    "n_beds": 20,
-    "assigned": 20,
-    "unassigned": 94438,
-    "solver_status": "OPTIMAL"
-  },
-  "status": "simulate_ok"
-}
-
-```
+| 项 | 入口 |
+|----|------|
+| Streamlit | `streamlit run presentation/streamlit_app.py` |
+| MLflow | `mlflow ui --backend-store-uri sqlite:///./mlflow.db` |
+| 说明 | [`TUNING_LOCAL.md`](TUNING_LOCAL.md) |
+| PPO smoke（Draft） | [`PPO_SMOKE.md`](PPO_SMOKE.md) · **不合 main** |
 
 ## 说明
 
-- CP-SAT P0 使用 top-200 候选（`configs/optimizer.yaml` `solver.candidate_cap`）；全量 94k×床不可在 30–60s 内求解
-- dump/artifact **不入 GitHub**；请线下分发
-- Draft PR #3 PPO 仍保持 Draft
-
-进度看板：`d:\project\_local-data\mimic\PROGRESS.md`
+- `candidate_cap` 只限制 CP-SAT 候选，**不**裁剪 labs/SOFA/feat
+- 真 online PPO 轨迹仍归 Draft PR #3 / 成员 B
+- 进度看板：`d:\project\_local-data\mimic\PROGRESS.md`
