@@ -1,29 +1,23 @@
-## 变更层
+## 人读摘要
 
-<!-- L1–L5 / scripts / docs -->
+| 项 | 内容 |
+|----|------|
+| Owner | A / B / C |
+| 关联 | Closes # |
 
 ## 做了什么
 
 ## 如何验证
 
 ```powershell
-
+$env:PYTHONPATH = (Get-Location)
+.\.venv\Scripts\python.exe -m pytest tests/ -q
 ```
 
-## 影响范围
+## 给 AI 的上下文
 
-- [ ] 数据 / migration
-- [ ] 算法 / CP-SAT / PPO
-- [ ] 应用（L4）
-- [ ] Streamlit
-- [ ] 脚本 / Docker
-- [ ] 仅文档
-
-## 关联 Issue
-
-Closes #
-
-## 集成负责人（成员 C）
-
-- [ ] 分层规则 OK
-- [ ] pytest 已通过
+```text
+默认 policy=cp_sat；PPO 勿默认启用
+参数：docs/PARAM_STORY.md
+分层：UI→L4→data_access
+```
