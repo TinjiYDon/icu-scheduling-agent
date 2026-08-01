@@ -1,13 +1,13 @@
 # 执行路线图 ROADMAP_EXEC（人机双可读）
 
-> 更新：2026-07-25 · Wave1 calib/eval 骨架 · Wave2 等 B SOFA 数值 · PPO 不合 main
+> 更新：2026-07-31 · Wave1 ✅ 骨架 · Wave2 ✅ 真实 SOFA simulate 数值入 STATUS · PPO 不合 main
 
 ## 人读摘要
 
 | Wave | 含义 | 状态 | 主责 |
 |------|------|------|------|
 | **1** | calib/eval 协议 + simulate `metrics` | ✅ 骨架 | C |
-| **2** | SOFA→feat + STATUS 数字 | ⏳ 等 B/A | B |
+| **2** | SOFA→feat + STATUS 数字 | ✅ 真实 SOFA 入库 + simulate 数值入 STATUS（2026-07-31）| B |
 | **PPO** | Draft PR #3 | 保持 Draft | B |
 
 | 划分 | 名称 | 规则 |
@@ -27,8 +27,8 @@ Wave1 注：assignment 仍可跑全量；Wave2 应由 B 按 calib/eval 子集限
 
 ## Wave2 等待清单
 
-- [ ] B：SOFA 写入 feat + simulate 指标入 STATUS（#4）— **或 Owner 代跑 sofa 后 B 填指标**
-- [ ] A：labs/完整 dump（#5）— Layer0 含 labevents 即可；Owner 可代导出
+- [x] B：SOFA 写入 feat + simulate 指标入 STATUS（#4）— ✅ 2026-07-31 真实 SOFA 已入库，simulate 数值已入 STATUS
+- [x] A：labs/完整 dump（#5）— ✅ 2026-07-27 Owner 已导出完整 dump 并恢复本地
 
 ## Owner 可代备（SOFA / CP-SAT · ≠ 真 PPO）
 
