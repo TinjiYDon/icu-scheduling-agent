@@ -1,2 +1,7 @@
 # Force LF line endings for shell scripts (required by Docker/Linux)
 *.sh text eol=lf
+# Force LF for code/config so diffs stay clean across Windows/Linux
+*.py text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.ps1 text eol=crlf

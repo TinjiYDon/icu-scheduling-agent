@@ -21,6 +21,10 @@ resources:
 rolling:
   step_hours: 2
 
+eval_split:
+  calib_ratio: 0.7   # 70% calib 调参 / 30% eval 只评估（不回写调参）
+  seed: 42
+
 policy:
   default: cp_sat   # cp_sat | ppo | hybrid
 

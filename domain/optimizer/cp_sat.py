@@ -15,6 +15,7 @@ from sqlalchemy import text
 
 from infra.config import load_yaml
 from infra.db import get_engine
+from domain.optimizer.eval_split import split_stay_ids
 
 
 def _careunit_zone(careunit: str | None) -> int:
@@ -99,7 +100,19 @@ def run_assignment(
     lambda_weights: Mapping[str, float] | None = None,
     *,
     persist: bool = True,
+    split: str | None = None,
 ) -> dict:
+    """Run CP-SAT bed assignment.
+
+    Args:
+        run_id: optional run identifier.
+        lambda_weights: optional lambda overrides.
+        persist: whether to write assignments into sched.assignments.
+        split: restrict candidates to "calib" (70% tuning) or "eval" (30%
+            report-only) per eval_split config. None = all candidates.
+    """
+    if split is not None and split not in ("calib", "eval"):
+        raise ValueError("split must be 'calib', 'eval' or None")
     opt = load_yaml("optimizer.yaml")
     lam = _resolve_lambda_weights(opt.get("lambda", {}), lambda_weights)
     n_beds = int(opt.get("resources", {}).get("n_beds", 20))
@@ -141,6 +154,22 @@ def run_assignment(
         ).mappings().all()
 
     stays = [dict(r) for r in rows]
+
+    # Restrict candidates to calib / eval subset (tuning only touches calib).
+    split_meta = None
+    if split is not None:
+        meta = split_stay_ids([int(s["stay_id"]) for s in stays])
+        keep = {int(x) for x in meta[f"{split}_stay_ids"]}
+        stays = [s for s in stays if int(s["stay_id"]) in keep]
+        split_meta = {
+            "split": split,
+            "calib_ratio": meta["calib_ratio"],
+            "seed": meta["seed"],
+            "n_calib": meta["n_calib"],
+            "n_eval": meta["n_eval"],
+            "n_candidates": len(stays),
+        }
+
     n = len(stays)
     if n == 0:
         return {
@@ -149,6 +178,8 @@ def run_assignment(
             "n_beds": n_beds,
             "n_stays": 0,
             "lambda": lam,
+            "split": split,
+            "split_meta": split_meta,
             "status": "empty",
             "evaluation": {
                 "assignment_rate": 0.0,
@@ -359,6 +390,8 @@ def run_assignment(
         "n_stays": n,
         "solver_status": "OPTIMAL" if status == cp_model.OPTIMAL else "FEASIBLE",
         "lambda": lam,
+        "split": split,
+        "split_meta": split_meta,
         "objective_scaling": {
             "bounds": objective_bounds,
             "coefficients": objective_coefficients,
