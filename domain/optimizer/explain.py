@@ -171,3 +171,26 @@ def _analyze_constraints(result: dict) -> list[tuple[str, bool, str]]:
         )
 
     return bindings
+
+
+if __name__ == "__main__":
+    import argparse
+
+    from domain.optimizer.cp_sat import run_assignment
+
+    parser = argparse.ArgumentParser(description="生成 ICU 调度可解释性报告")
+    parser.add_argument(
+        "--split",
+        choices=["calib", "eval"],
+        default=None,
+        help="限制候选到 calib/eval 子集（默认全量候选）",
+    )
+    parser.add_argument(
+        "--persist",
+        action="store_true",
+        help="写入 sched.assignments（默认不写，仅解释）",
+    )
+    args = parser.parse_args()
+
+    result = run_assignment(split=args.split, persist=args.persist)
+    print(explain_assignment(result))
