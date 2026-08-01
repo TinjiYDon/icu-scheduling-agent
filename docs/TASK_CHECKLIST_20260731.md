@@ -1,6 +1,7 @@
-# 任务清单 · 2026-07-31
+# 任务清单 · 2026-07-31（持续更新）
 
 > 数据里程碑（2026-07-27）：真实 MIMIC 已导入！阻塞解除 ✅
+> 更新：2026-08-01 · 任务③④⑤ 完成 · λ quick 实验产出推荐值（待队友确认）
 
 ---
 
@@ -18,38 +19,51 @@
 
 ---
 
-## 📌 需要你（B）完成的任务
+## 📌 你（B）已完成的任务
 
-| # | 任务 | 说明 | 阻塞 |
+| # | 任务 | 说明 | 完成 |
 |:-:|------|------|:--:|
-| 1 | ~~恢复新 dump~~ | ✅ 2026-07-31 已恢复，真实 SOFA 94,458 行入本地库 | — |
-| 2 | ~~S2-2 Wave2~~ | ✅ 2026-07-31 真实 SOFA 跑通 simulate，数值已写入 STATUS | — |
-| 3 | **calib/eval 子集限制** | 按 70/30 划分，求解只用 calib 集 | ② |
-| 4 | ~~CP-SAT 业务指标完善~~ | ✅ 2026-08-01 新增 5 指标（unassigned / high_risk_waiting / avg_assigned_sofa / 隔离与呼吸机利用率）+ 候选 tiebreaker 可复现 | — |
-| 5 | **S4-1 PPO** | 保持 Draft PR #3，训 PPO 对比 CP-SAT（不进 main） | ②+ |
+| 1 | 恢复新 dump | 真实 SOFA 94,458 行入本地库 | 07-31 |
+| 2 | S2-2 Wave2 | 真实 SOFA 跑通 simulate，数值入 STATUS | 07-31 |
+| 3 | calib/eval 子集限制 | `run_assignment(split=...)` 70/30、seed=42 | 08-01 |
+| 4 | S2-1 业务指标完善 | +5 指标 + 候选 tiebreaker 可复现 | 08-01 |
+| 5 | λ 网格搜索（quick） | 16 组 calib 实验 + `--split` 支持，推荐值待确认 | 08-01 |
+| 6 | 可解释输出 | `explain.py` CLI + Streamlit 面板原生组件渲染 | 08-01 |
 
 ---
+
+## 📌 待完成任务
+
+| # | 任务 | 说明 | 阻塞/前置 |
+|:-:|------|------|:--:|
+| 7 | λ 完整 256 组合 | `tune_lambda.py --split calib`（约 5-10 分钟）| 无 |
+| 8 | λ 推荐值确认 | 队友 C 确认 6 场景后再写回 `optimizer.yaml` | ⑦ / 队友 |
+| 9 | λ eval 验证 | `--split eval` 跑推荐 λ，报告公正指标 | ⑦ |
+| 10 | S4-1 PPO | 保持 Draft PR #3，训 PPO 对比 CP-SAT（不进 main）| — |
 
 ## 📌 队友待完成
 
 | # | 任务 | 主责 |
 |:-:|------|:--:|
-| 6 | pytest CI 流水线 | A |
-| 7 | PR checklist | C |
-| 8 | PPO 验收（你的成果） | C 审核 |
+| 11 | pytest CI 流水线 | A |
+| 12 | PR checklist | C |
+| 13 | PPO 验收（你的成果） | C 审核 |
 
 ---
 
-## ✅ 你已完成（已合并 main）
+## ✅ 你已完成（分支已推送 origin/feat/cp-sat-multi-obj）
 
 - CP-SAT 四目标模型（等待/超负荷/均衡/科室匹配）
 - 隔离床 + 呼吸机 + 床位分区约束
-- 可解释输出 `explain.py`
+- 可解释输出 `explain.py`（终端 CLI + Streamlit 面板组件化）
 - 滚动时域仿真 `rolling/engine.py`
-- 合成 SOFA（已被真实数据取代）
+- calib/eval split 限制求解（70/30, seed=42）
+- 业务指标 13 项（含 unassigned/high_risk_waiting/avg_assigned_sofa/资源利用率）
+- λ 网格搜索（quick 16 组 → `reports/lambda_tuning_*.csv|json`）
+- 候选排序 tiebreaker + .gitattributes 统一 LF（可复现）
 
 ---
 
 ## 一句话下一步
 
-**先恢复新 dump → 用真实 SOFA 跑一遍 simulate → 填 STATUS 数值 → 再做 PPO。**
+**跑完整 256 组合 λ 搜索 → 队友确认推荐值写回 optimizer.yaml → eval 验证 → PPO。**
