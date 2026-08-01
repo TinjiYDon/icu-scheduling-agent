@@ -41,7 +41,16 @@ def iter_lambda_grid(
 
 def run_lambda_grid(
     search_space: Mapping[str, Sequence[float]],
+    *,
+    split: str | None = None,
 ) -> list[dict[str, float | str]]:
+    """Run one CP-SAT assignment per lambda combination.
+
+    Args:
+        search_space: per-lambda candidate values (all 4 dims required).
+        split: restrict every run to "calib" (tuning) or "eval" (report-only)
+            per eval_split config. None = all candidates.
+    """
     rows: list[dict[str, float | str]] = []
     for index, weights in enumerate(iter_lambda_grid(search_space), start=1):
         run_id = "tune_{:04d}_{}".format(
@@ -49,7 +58,7 @@ def run_lambda_grid(
             "_".join(f"{name[:1]}{value:g}" for name, value in weights.items()),
         )
         result = run_assignment(
-            run_id=run_id, lambda_weights=weights, persist=False
+            run_id=run_id, lambda_weights=weights, persist=False, split=split
         )
         evaluation = result.get("evaluation", {})
         rows.append(

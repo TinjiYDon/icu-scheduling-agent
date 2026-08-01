@@ -12,6 +12,12 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--quick", action="store_true", help="Run 16 one-factor sensitivity cases")
     parser.add_argument("--output", default="reports/lambda_tuning.csv")
+    parser.add_argument(
+        "--split",
+        choices=["calib", "eval"],
+        default="calib",
+        help="求解子集：calib(默认,调参) / eval(仅评估)；禁止在 eval 上调参",
+    )
     args = parser.parse_args()
 
     if args.quick:
@@ -31,7 +37,7 @@ def main() -> None:
             "zone_mismatch": [0.1, 0.5, 1.0, 2.0],
         }
 
-    rows = run_lambda_grid(search_space)
+    rows = run_lambda_grid(search_space, split=args.split)
     output = write_csv(rows, args.output)
     write_csv(pareto_front(rows), output.with_name("lambda_tuning_pareto.csv"))
     recommendation = recommend_row(rows)
