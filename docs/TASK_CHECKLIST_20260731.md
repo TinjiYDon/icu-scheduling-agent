@@ -25,7 +25,7 @@
 | 1 | ~~恢复新 dump~~ | ✅ 2026-07-31 已恢复，真实 SOFA 94,458 行入本地库 | — |
 | 2 | ~~S2-2 Wave2~~ | ✅ 2026-07-31 真实 SOFA 跑通 simulate，数值已写入 STATUS | — |
 | 3 | **calib/eval 子集限制** | 按 70/30 划分，求解只用 calib 集 | ② |
-| 4 | **S2-1 指标完善** | CP-SAT 补业务指标（分配率/危重患者覆盖等） | ② |
+| 4 | ~~CP-SAT 业务指标完善~~ | ✅ 2026-08-01 新增 5 指标（unassigned / high_risk_waiting / avg_assigned_sofa / 隔离与呼吸机利用率）+ 候选 tiebreaker 可复现 | — |
 | 5 | **S4-1 PPO** | 保持 Draft PR #3，训 PPO 对比 CP-SAT（不进 main） | ②+ |
 
 ---
