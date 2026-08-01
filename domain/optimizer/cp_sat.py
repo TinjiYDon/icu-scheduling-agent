@@ -146,7 +146,7 @@ def run_assignment(
                 FROM staging.icustays s
                 LEFT JOIN feat.patient_priority p ON s.stay_id = p.stay_id
                 LEFT JOIN feat.sofa_timeseries so ON s.stay_id = so.stay_id AND so.hour_index = 0
-                ORDER BY priority_weight DESC, sofa_total DESC
+                ORDER BY priority_weight DESC, sofa_total DESC, s.stay_id
                 LIMIT :max_patients
                 """
             ),
@@ -190,6 +190,11 @@ def run_assignment(
                 "balance_deviation": 0,
                 "zone_match_rate": 0.0,
                 "solve_time_seconds": 0.0,
+                "unassigned": 0,
+                "high_risk_waiting": 0,
+                "avg_assigned_sofa": 0.0,
+                "isolation_utilization": 0.0,
+                "ventilator_utilization": 0.0,
             },
         }
 
@@ -381,6 +386,7 @@ def run_assignment(
     high_risk_total = sum(1 for s in stays if float(s["sofa_total"]) >= 10)
     high_risk_assigned = sum(1 for a in assignments if float(a["sofa_total"]) >= 10)
     assigned_priority_total = sum(float(a["priority_weight"]) for a in assignments)
+    assigned_sofa_total = sum(float(a["sofa_total"]) for a in assignments)
     assigned_count = len(assignments)
 
     return {
@@ -420,6 +426,18 @@ def run_assignment(
                 n_zone_match / assigned_count, 4
             ) if assigned_count else 0.0,
             "solve_time_seconds": round(solver.WallTime(), 4),
+            # ── business metrics (lambda-independent, clinical meaning) ──
+            "unassigned": n - assigned_count,
+            "high_risk_waiting": max(high_risk_total - high_risk_assigned, 0),
+            "avg_assigned_sofa": round(
+                assigned_sofa_total / assigned_count, 4
+            ) if assigned_count else 0.0,
+            "isolation_utilization": round(
+                n_iso_used / n_iso_beds, 4
+            ) if n_iso_beds else 0.0,
+            "ventilator_utilization": round(
+                n_vent_used / n_vents, 4
+            ) if n_vents else 0.0,
         },
         "resources": {
             "isolation_beds_used": f"{n_iso_used}/{n_iso_beds}",

@@ -105,3 +105,27 @@ def test_split_calib_eval_disjoint_and_meta(fake_db):
     calib_ids = {a["stay_id"] for a in calib["top_assignments"]}
     eval_ids = {a["stay_id"] for a in ev["top_assignments"]}
     assert calib_ids.isdisjoint(eval_ids)
+
+
+def test_evaluation_has_business_metrics(fake_db):
+    """Task #4: evaluation exposes clinical business metrics, lambda-independent."""
+    out = run_assignment(split=None, persist=False)
+    ev = out["evaluation"]
+
+    for key in (
+        "unassigned",
+        "high_risk_waiting",
+        "avg_assigned_sofa",
+        "isolation_utilization",
+        "ventilator_utilization",
+    ):
+        assert key in ev, f"missing evaluation key: {key}"
+
+    # unassigned + assigned == candidates (self-consistency)
+    assert ev["unassigned"] == out["n_stays"] - out["assigned"]
+    assert 0.0 <= ev["high_risk_waiting"] <= out["n_stays"]
+    # utilization rates must be in [0, 1]
+    assert 0.0 <= ev["isolation_utilization"] <= 1.0
+    assert 0.0 <= ev["ventilator_utilization"] <= 1.0
+    # avg assigned sofa is non-negative
+    assert ev["avg_assigned_sofa"] >= 0.0

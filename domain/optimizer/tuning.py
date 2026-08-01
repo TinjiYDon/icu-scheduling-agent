@@ -67,6 +67,12 @@ def run_lambda_grid(
                     "balance_deviation",
                     "zone_match_rate",
                     "solve_time_seconds",
+                    # business metrics added in task #4
+                    "unassigned",
+                    "high_risk_waiting",
+                    "avg_assigned_sofa",
+                    "isolation_utilization",
+                    "ventilator_utilization",
                 )},
             }
         )
