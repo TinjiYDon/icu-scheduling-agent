@@ -4,24 +4,24 @@
 
 ## 一、zip 文件
 
-| 项 | 内容 |
-|----|------|
-| 文件 | `artifacts/ppo_icu.zip`（约 281 KB）|
-| 来源 | B 本地训练（200K 步 · 8.6 分钟）|
-| 传递 | **不走 Git**（`artifacts/` 已 gitignore）→ 网盘/文件手动传 |
-| 放置路径 | `d:\project\icu-scheduling-agent\artifacts\ppo_icu.zip` |
+| 项       | 内容                                                       |
+| -------- | ---------------------------------------------------------- |
+| 文件     | `artifacts/ppo_icu.zip`（约 281 KB）                       |
+| 来源     | B 本地训练（200K 步 · 8.6 分钟）                           |
+| 传递     | **不走 Git**（`artifacts/` 已 gitignore）→ 网盘/文件手动传 |
+| 放置路径 | `d:\project\icu-scheduling-agent\artifacts\ppo_icu.zip`    |
 
 > ⚠️ 必须放对路径，`run_ppo.py`/`evaluate_ppo.py` 默认读 `artifacts/ppo_icu`。
 
 ## 二、模型信息
 
-| 项 | 值 |
-|----|----|
-| 算法 | MaskablePPO（MlpPolicy）· `sb3-contrib 2.9` |
-| 训练步数 | 200,000（收敛，训练奖励 68 → 74.6）|
-| 配置 | `optimizer.yaml` → `ppo` 段（lr=3e-4 · gamma=0.99 · batch=64 · n_steps=256 · seed=42）|
-| 数据 | 真实 SOFA（20260727 dump）训练池 200 患者 × 20 床 |
-| 评估 | PPO 73.1 vs Greedy 73.6 vs CP-SAT 13/200（`reports/ppo_evaluation.json`）|
+| 项       | 值                                                                                     |
+| -------- | -------------------------------------------------------------------------------------- |
+| 算法     | MaskablePPO（MlpPolicy）· `sb3-contrib 2.9`                                            |
+| 训练步数 | 200,000（收敛，训练奖励 68 → 74.6）                                                    |
+| 配置     | `optimizer.yaml` → `ppo` 段（lr=3e-4 · gamma=0.99 · batch=64 · n_steps=256 · seed=42） |
+| 数据     | 真实 SOFA（20260727 dump）训练池 200 患者 × 20 床                                      |
+| 评估     | PPO 73.1 vs Greedy 73.6 vs CP-SAT 13/200（`reports/ppo_evaluation.json`）              |
 
 ## 三、面板接入状态
 
@@ -31,6 +31,7 @@
 - `PPO`：走 `application/run_ppo.py` → `predict_assignments()`，展示分配结果、总奖励和 reward 分解。
 
 命令行验证（不依赖面板）：
+
 ```powershell
 $env:PYTHONPATH = (Get-Location)
 .\.venv\Scripts\python.exe -m application.run_ppo       # PPO 推理
