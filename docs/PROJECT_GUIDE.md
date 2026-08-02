@@ -38,38 +38,32 @@ $env:PYTHONPATH = (Get-Location)
 ### 3. 仿真与演示（成员 C 骨架 ✅）
 
 ```powershell
-python -m application.simulate
-python -m application.run_p0
-streamlit run presentation/streamlit_app.py
+$env:PYTHONPATH = (Get-Location)
+.\.venv\Scripts\python.exe -m application.simulate
+.\.venv\Scripts\python.exe -m streamlit run presentation/streamlit_app.py --server.port 8502
 ```
 
-L4：`run_simulation_with_plan()` · `get_plan()` — 见 [`docs/TODO_OWNER.md`](TODO_OWNER.md)
+L4：`run_simulation_with_plan()` · `get_plan()` — Ops/Accept 监测台见 [`TUNING_LOCAL.md`](TUNING_LOCAL.md)
 
 ### 从已有 dump 恢复
 
 ```powershell
-.\scripts\restore_layer1.ps1 -DumpFile .\dumps\icu_scheduling_P0-etl_mimic_94458stays_20260708.dump
-.\scripts\bootstrap_from_dump.ps1 -SkipEtl
+.\scripts\restore_layer1.ps1 -DumpFile .\dumps\icu_scheduling_P0-full_mimic_94458stays_20260802.dump
 ```
+
+详见 [`DUMP_READY.md`](DUMP_READY.md)。
 
 ## 检查点一览
 
 | 阶段 | 状态 |
 |------|------|
 | ETL + dump + 冒烟 | **已完成** |
-| CP-SAT + Streamlit | C 骨架 ✅ · B 指标待完善 |
+| CP-SAT + Plotly Ops | ✅ |
+| online PPO 轨迹 | ❌ 无 MIMIC 轨迹包 |
 
 ## dump 命名
 
-`icu_scheduling_P0-etl_{layer0}_{N}stays_{yyyymmdd}.dump` → 存放于 `dumps/`
-
-## 待完成
-
-| 项 | 位置 |
-|----|------|
-| CP-SAT 指标 / 目标分解 | B · `domain/optimizer/` |
-| PPO | `domain/optimizer/` |
-| MCP Tool | `docs/INNOVATION_ROADMAP.md` |
+当前交付：`icu_scheduling_P0-full_mimic_94458stays_20260802.dump`（`dumps/`，不入 Git）
 
 ## 注意
 

@@ -1,0 +1,26 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install deps
+        run: |
+          python -m pip install -U pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install pytest pyyaml pandas numpy ortools pydantic
+          pip install "gymnasium" "sb3-contrib" "stable-baselines3" || true
+      - name: Unit tests (no DB)
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          pytest tests/test_plan.py tests/test_simulate_metrics.py tests/test_rl_env.py tests/test_ppo_training_smoke.py -q --tb=line
