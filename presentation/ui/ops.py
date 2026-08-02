@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 OPT_PATH = ROOT / "configs" / "optimizer.yaml"
 
 
-def _sidebar_controls() -> int:
+def _sidebar_controls() -> tuple[int, bool]:
     opt = load_yaml("optimizer.yaml")
     resources = dict(opt.get("resources") or {})
     solver = dict(opt.get("solver") or {})
@@ -39,6 +39,7 @@ def _sidebar_controls() -> int:
         value=int(solver.get("max_time_seconds", 180)),
     )
     n_steps = st.sidebar.number_input("滚动步数 n_steps", min_value=1, max_value=48, value=12)
+    auto_run = st.sidebar.checkbox("首次进入自动运行", value=True, key="ops_auto_run_enabled")
     if st.sidebar.button("保存配置", type="primary"):
         opt["resources"] = {**resources, "n_beds": int(n_beds)}
         opt["solver"] = {
@@ -51,11 +52,22 @@ def _sidebar_controls() -> int:
             encoding="utf-8",
         )
         st.sidebar.success("已保存 optimizer.yaml")
-    return int(n_steps)
+    st.sidebar.caption("ui v4 · `scripts\\run_console.ps1`")
+    return int(n_steps), bool(auto_run)
+
+
+def _pct(v: object) -> str:
+    if v is None:
+        return "—"
+    try:
+        return f"{float(v) * 100:.1f}%"
+    except (TypeError, ValueError):
+        return str(v)
 
 
 def _kpi_row(sim: dict, plan: dict) -> None:
     m = plan.get("metrics") or {}
+    ev = sim.get("evaluation") or {}
     items = [
         ("求解状态", m.get("solver_status", sim.get("solver_status", "—"))),
         ("床位数", m.get("n_beds", sim.get("n_beds", "—"))),
@@ -68,23 +80,53 @@ def _kpi_row(sim: dict, plan: dict) -> None:
     for col, (lbl, val) in zip(cols, items):
         col.metric(lbl, val)
 
+    hr = m.get("high_risk_assigned_rate", sim.get("high_risk_assigned_rate", ev.get("high_risk_assigned_rate")))
+    zm = m.get("zone_match_rate", sim.get("zone_match_rate", ev.get("zone_match_rate")))
+    obj = m.get("objective") or sim.get("objective") or {}
+    c2 = st.columns(4)
+    c2[0].metric("高危分配率", _pct(hr))
+    c2[1].metric("Zone 匹配率", _pct(zm))
+    c2[2].metric("f₄ zone mismatch", obj.get("f4_zone_mismatch", "—"))
+    c2[3].metric("求解秒数", m.get("solve_time_seconds", ev.get("solve_time_seconds", "—")))
+
+
+def _style_high_sofa(df: pd.DataFrame) -> pd.DataFrame:
+    if "sofa_total" not in df.columns:
+        return df
+    return df.sort_values("sofa_total", ascending=False)
+
 
 def render_ops() -> None:
     st.title("ICU 床位调度 · 运行台")
-    st.caption("CP-SAT 分配 + 滚动占用 · Plotly 可视化")
+    st.caption("CP-SAT 分配 + 滚动占用 · Plotly 可视化 · 首次可自动运行")
 
-    n_steps = _sidebar_controls()
+    n_steps, auto_enabled = _sidebar_controls()
     if "last_sim_payload" not in st.session_state:
         st.session_state.last_sim_payload = None
+    if "ops_auto_ran" not in st.session_state:
+        st.session_state.ops_auto_ran = False
 
     run_col, _ = st.columns([1, 3])
     with run_col:
         run = st.button("运行 CP-SAT + 滚动仿真", type="primary", use_container_width=True)
 
+    should_auto = (
+        auto_enabled
+        and not st.session_state.ops_auto_ran
+        and st.session_state.last_sim_payload is None
+        and not run
+    )
+    if should_auto:
+        st.session_state.ops_auto_ran = True
+        with st.spinner("首次进入：自动运行 CP-SAT + 滚动仿真…"):
+            st.session_state.last_sim_payload = run_simulation_with_plan(n_steps=n_steps)
+        st.success("自动运行完成（侧栏可关闭「首次进入自动运行」）")
+
     if run:
         with st.spinner("SOFA → CP-SAT → 滚动仿真…"):
             payload = run_simulation_with_plan(n_steps=n_steps)
         st.session_state.last_sim_payload = payload
+        st.session_state.ops_auto_ran = True
         st.success(
             f"完成 · run_id={payload['plan'].get('run_id')} · "
             f"求解={payload['simulate'].get('solver_status')} · "
@@ -96,6 +138,16 @@ def render_ops() -> None:
         sim = payload["simulate"]
         plan = payload["plan"]
         _kpi_row(sim, plan)
+        explain = plan.get("explain")
+        with st.sidebar:
+            st.markdown("### 可解释报告")
+            if explain:
+                st.text(explain[:4000] if len(explain) > 4000 else explain)
+            else:
+                st.caption("本次无解释文本")
+        with st.expander("完整可解释报告"):
+            st.code(explain or "（空）")
+
         hist = sim.get("history") or []
         n_beds = int(sim.get("n_beds") or 20)
         if hist:
@@ -112,8 +164,13 @@ def render_ops() -> None:
                 st.dataframe(pd.DataFrame(hist), use_container_width=True, hide_index=True)
         rows = plan.get("assignments") or []
         if rows:
-            st.subheader("床位分配结果")
-            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+            st.subheader("床位分配结果（高 SOFA 优先列出）")
+            df = _style_high_sofa(pd.DataFrame(rows))
+            st.dataframe(df, use_container_width=True, hide_index=True)
+            if "sofa_total" in df.columns:
+                hi = df[df["sofa_total"].fillna(0) >= 10]
+                if len(hi):
+                    st.caption(f"高危 SOFA≥10：{len(hi)} 人已分配（表已按 SOFA 降序）")
         with st.expander("仿真 JSON"):
             st.json(sim)
     else:

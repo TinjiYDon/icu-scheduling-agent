@@ -23,8 +23,17 @@ $env:PYTHONPATH = (Get-Location)
 | [docs/PROJECT_GUIDE.md](docs/PROJECT_GUIDE.md) | 架构、流程、命令 |
 | [docs/DUMP_READY.md](docs/DUMP_READY.md) | **线下 dump 单发 / restore** |
 | [docs/TUNING_LOCAL.md](docs/TUNING_LOCAL.md) | Plotly Ops 台启动 |
+| [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) | **答辩演示口播** |
 | [docs/STATUS.md](docs/STATUS.md) | 当前进度 |
 | [docs/README.md](docs/README.md) | 文档索引 |
+
+## 答辩演示
+
+```powershell
+.\scripts\run_console.ps1
+```
+
+口播步骤见 [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)：项目总览 → 运行（自动仿真 + 可解释）→ 验收。
 
 ## 架构
 
@@ -43,7 +52,7 @@ docker compose up -d   # PostgreSQL 端口 5434
 ```powershell
 $env:PYTHONPATH = (Get-Location)
 .\.venv\Scripts\python.exe -m application.simulate
-.\.venv\Scripts\python.exe -m streamlit run presentation/streamlit_app.py --server.port 8502
+.\scripts\run_console.ps1
 ```
 
-线下 dump：**不入 Git**，见 [`docs/DUMP_READY.md`](docs/DUMP_READY.md)。页面：Ops / Accept。默认策略 `cp_sat`（无 MIMIC PPO 轨迹时勿宣称 online RL）。
+线下 dump：**不入 Git**，见 [`docs/DUMP_READY.md`](docs/DUMP_READY.md)。页面：项目 / 运行 / 验收。默认策略 `cp_sat`（无 MIMIC PPO 轨迹时勿宣称 online RL）。

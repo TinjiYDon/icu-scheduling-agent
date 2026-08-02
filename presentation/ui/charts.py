@@ -97,9 +97,9 @@ def fig_sofa_avg(history: Sequence[dict[str, Any]]) -> go.Figure:
         )
     )
     fig.update_layout(
-        title="Average SOFA of occupied patients",
-        xaxis_title="step",
-        yaxis_title="avg SOFA",
+        title="在床患者平均 SOFA",
+        xaxis_title="步",
+        yaxis_title="平均 SOFA",
         height=280,
         margin=dict(l=40, r=20, t=48, b=40),
         paper_bgcolor="rgba(0,0,0,0)",

@@ -1,6 +1,7 @@
 ﻿# 项目状态
 
-> 更新：2026-08-02 · **滚动时域实时调度**主叙事 · Wave2 SOFA simulate 数值保留
+> 更新：2026-08-02 · **滚动时域实时调度**主叙事 · Wave2 SOFA simulate 数值保留  
+> **演示台 v4**：总览 + Ops 自动跑/可解释/高危与 zone KPI · 口播 [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md)
 
 ## 数据
 
@@ -9,7 +10,7 @@
 | Layer0 labevents | ✅ 158,374,764 |
 | feat.sofa_timeseries | ✅ 94,458（真实 SOFA · 0~12 · avg 4.74）|
 | dump | ✅ `dumps/icu_scheduling_P0-full_mimic_94458stays_20260802.dump` · 见 [`DUMP_READY.md`](DUMP_READY.md) |
-| 交互台 | ✅ **Plotly Ops 台** Ops/Accept · `python -m streamlit run presentation/streamlit_app.py` |
+| 交互台 | ✅ **Plotly Ops 台 v4** 项目/运行/验收 · `.\scripts\run_console.ps1` |
 | 下一步 | [`TOP_TIER_NEXT.md`](TOP_TIER_NEXT.md) |
 | 交付说明 | [`DUMP_READY.md`](DUMP_READY.md) |
 | simulate | ✅ OPTIMAL · **n_candidates=1000** · assigned=20 |
