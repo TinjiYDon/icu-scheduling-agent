@@ -35,7 +35,8 @@
 
 ## S4 · 进阶
 
-- [ ] **#S4-1** B：PPO stub（P3 · 保持 Draft PR #3）  
+- [x] **#S4-1a** B：PPO/lambda 代码入 main（PR #3 ✅ 2026-07-30 · 默认仍 cp_sat）
+- [ ] **#S4-1b** B：MIMIC `sim` 轨迹包 + 真训（**未交付** · 见 `PPO_SMOKE.md`）
 - [x] **#S4-2** C：MCP `optimize_beds`（骨架 ✅ 2026-07-22）
 
 ---

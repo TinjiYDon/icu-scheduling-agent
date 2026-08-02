@@ -14,7 +14,7 @@
 | CP-SAT / plan / Streamlit | ✅ |
 | 用已写入的 `feat.sofa_timeseries` | ✅ |
 | 从零重算 SOFA（需 Layer0 labevents） | 需本机 `mimic` labs 或向 Owner 要 Layer0 说明 |
-| online PPO 轨迹 | ❌ → `docs/PPO_SMOKE.md` / Draft PR #3 |
+| online PPO 轨迹 | ❌ 本地无轨迹包 → `docs/PPO_SMOKE.md` |
 
 ```powershell
 .\scripts\restore_layer1.ps1 -DumpFile .\dumps\icu_scheduling_P0-full_mimic_94458stays_20260727.dump

@@ -1,14 +1,14 @@
 # 执行路线图 ROADMAP_EXEC（人机双可读）
 
-> 更新：2026-07-31 · Wave1 ✅ 骨架 · Wave2 ✅ 真实 SOFA simulate 数值入 STATUS · PPO 不合 main
+> 更新：2026-08-02 · Wave2 SOFA 数值 ✅ · PR #3 已合 main · 默认仍 cp_sat · 无 MIMIC 轨迹
 
 ## 人读摘要
 
 | Wave | 含义 | 状态 | 主责 |
 |------|------|------|------|
-| **1** | calib/eval 协议 + simulate `metrics` | ✅ 骨架 | C |
-| **2** | SOFA→feat + STATUS 数字 | ✅ 真实 SOFA 入库 + simulate 数值入 STATUS（2026-07-31）| B |
-| **PPO** | Draft PR #3 | 保持 Draft | B |
+| **1** | calib/eval + simulate metrics | ✅ | C |
+| **2** | SOFA→feat + STATUS 数字 | ✅ 2026-07-31 | B |
+| **PPO** | 代码在 main（PR #3） | ✅ 已合 · **默认未启用** · 无轨迹 | B |
 
 | 划分 | 名称 | 规则 |
 |------|------|------|
@@ -17,33 +17,15 @@
 ## Agent 上下文
 
 ```text
-配置：configs/optimizer.yaml → eval_split
-代码：domain/optimizer/eval_split.py · application/simulate.py metrics
-验收：pytest tests/test_simulate_metrics.py tests/test_plan.py -q
+配置：configs/optimizer.yaml → policy.default=cp_sat · eval_split · ppo.*
+验收：pytest tests/test_simulate_metrics.py tests/test_plan.py tests/test_ppo_training_smoke.py -q
 仿真：python -m application.simulate
-禁止：在 eval 集上调 lambda；宣称 schemas_only dump 可训 PPO
-Wave1 注：assignment 仍可跑全量；Wave2 应由 B 按 calib/eval 子集限制求解
+禁止：宣称已有 MIMIC online PPO 轨迹；在 eval 上调 lambda
 ```
 
-## Wave2 等待清单
+## 清单
 
-- [x] B：SOFA 写入 feat + simulate 指标入 STATUS（#4）— ✅ 2026-07-31 真实 SOFA 已入库，simulate 数值已入 STATUS
-- [x] A：labs/完整 dump（#5）— ✅ 2026-07-27 Owner 已导出完整 dump 并恢复本地
-
-## Owner 可代备（SOFA / CP-SAT · ≠ 真 PPO）
-
-```powershell
-$env:PYTHONPATH = (Get-Location)
-# Layer0 DSN 指向含 mimiciv_hosp.labevents 的库
-.\.venv\Scripts\python.exe -c "from domain.scoring.sofa import compute_sofa_timeseries; print(compute_sofa_timeseries())"
-.\.venv\Scripts\python.exe -m application.simulate
-.\scripts\export_layer1.ps1 -MimicSource mimic
-```
-
-| 代备项 | 能支撑 | 不能支撑 |
-|--------|--------|----------|
-| labs→`feat.sofa_timeseries` + priority | CP-SAT / plan 演示、Wave2 指标 | — |
-| 完整 Layer1 dump | A/B 复现 | — |
-| Draft PR#3 合成 env smoke | PPO **冒烟** | **online / 全量真实 PPO**（需 `sim` 轨迹 + 审查合入） |
-
-**PPO 边界**：准备好 labs/SOFA/feat **方便 B 做优化与对比**，但**不等于**已为 PPO 备好训练轨迹。真 PPO 仍走 Draft PR #3，不合 main 直至数据与审查通过。
+- [x] B：SOFA + simulate 指标入 STATUS
+- [x] Owner dump / labs 底座
+- [x] PR #3 merge（lambda + 合成 PPO 代码）
+- [ ] MIMIC `sim` 轨迹包（**未做**）

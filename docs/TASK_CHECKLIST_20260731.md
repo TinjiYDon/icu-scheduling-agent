@@ -26,7 +26,7 @@
 | 2 | ~~S2-2 Wave2~~ | ✅ 2026-07-31 真实 SOFA 跑通 simulate，数值已写入 STATUS | — |
 | 3 | **calib/eval 子集限制** | 按 70/30 划分，求解只用 calib 集 | ② |
 | 4 | **S2-1 指标完善** | CP-SAT 补业务指标（分配率/危重患者覆盖等） | ② |
-| 5 | **S4-1 PPO** | 保持 Draft PR #3，训 PPO 对比 CP-SAT（不进 main） | ②+ |
+| 5 | **S4-1 PPO** | PR #3 已合；默认 cp_sat；缺 MIMIC 轨迹真训 | ②+ |
 
 ---
 

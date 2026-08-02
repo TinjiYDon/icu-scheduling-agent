@@ -38,7 +38,7 @@ streamlit run presentation/streamlit_app.py
 - MCP：`optimize_beds(run_id?)` → 同上（`presentation/mcp_tools.py`）
 - 参数故事：`docs/PARAM_STORY.md`
 - Bugbot：`docs/BUGBOT.md`
-- 默认策略：`cp_sat`；Draft PR #3 的 PPO **不进 main** 直至数据与审查通过
+- 默认策略：`cp_sat`；PR #3（lambda+PPO 代码）**已合 main**，但默认未切 PPO；**无 MIMIC 轨迹包**
 
 ## 分层
 

@@ -31,12 +31,12 @@
 | Streamlit | `streamlit run presentation/streamlit_app.py` |
 | MLflow | `mlflow ui --backend-store-uri sqlite:///./mlflow.db` |
 | 说明 | [`TUNING_LOCAL.md`](TUNING_LOCAL.md) |
-| PPO smoke（Draft） | [`PPO_SMOKE.md`](PPO_SMOKE.md) · **不合 main** |
+| PPO smoke | [`PPO_SMOKE.md`](PPO_SMOKE.md) · 代码在 main · **默认 cp_sat** · 无 MIMIC 轨迹 |
 
 ## 说明
 
 - `candidate_cap` 只限制 CP-SAT 候选，**不**裁剪 labs/SOFA/feat
 - **dump 可支撑** CP-SAT/仿真；**不可**单独支撑 online PPO 轨迹
-- 真 online PPO 仍归 Draft PR #3 / 成员 B
-- GitHub（2026-07-27）：仅 open Draft PR #3；无新 PR 可合
+- PR #3 已于 2026-07-30 合入 main；`policy.default` 仍为 `cp_sat`
+- GitHub（2026-08-02）：无 open PR；轨迹仍缺
 - 进度看板：`d:\project\_local-data\mimic\PROGRESS.md`
