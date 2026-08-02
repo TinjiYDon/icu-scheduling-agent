@@ -27,7 +27,7 @@
 | 2 | S2-2 Wave2 | 真实 SOFA 跑通 simulate，数值入 STATUS | 07-31 |
 | 3 | calib/eval 子集限制 | `run_assignment(split=...)` 70/30、seed=42 | 08-01 |
 | 4 | S2-1 业务指标完善 | +5 指标 + 候选 tiebreaker 可复现 | 08-01 |
-| 5 | λ 网格搜索（quick） | 16 组 calib 实验 + `--split` 支持，推荐值待确认 | 08-01 |
+| 5 | λ 网格搜索（quick + 完整 256）| quick 16 组 + 完整 256 组 calib 实验，推荐值待队友确认 | 08-01/02 |
 | 6 | 可解释输出 | `explain.py` CLI + Streamlit 面板原生组件渲染 | 08-01 |
 
 ---
@@ -36,9 +36,9 @@
 
 | # | 任务 | 说明 | 阻塞/前置 |
 |:-:|------|------|:--:|
-| 7 | λ 完整 256 组合 | `tune_lambda.py --split calib`（约 5-10 分钟）| 无 |
-| 8 | λ 推荐值确认 | 队友 C 确认 6 场景后再写回 `optimizer.yaml` | ⑦ / 队友 |
-| 9 | λ eval 验证 | `--split eval` 跑推荐 λ，报告公正指标 | ⑦ |
+| 7 | ~~λ 完整 256 组合~~ | ✅ 2026-08-02 跑完，Pareto 9 解，推荐 w0.5/o0.1/b0.1/z0.1 | — |
+| 8 | λ 推荐值确认 | 队友 C 确认 6 场景后再写回 `optimizer.yaml` | 队友 |
+| 9 | λ eval 验证 | `--split eval` 跑推荐 λ，报告公正指标 | — |
 | 10 | S4-1 PPO | 保持 Draft PR #3，训 PPO 对比 CP-SAT（不进 main）| — |
 
 ## 📌 队友待完成
