@@ -2,29 +2,28 @@
 
 > 本仓库独立演进；MCP 仅作为对外标准接口，不与其他 ICU 项目耦合。
 
-## 目标
+## 目标（实时落地）
 
-**可解释资源动态调度**：SOFA 临床评分 → 系统状态 → CP-SAT 求解 → 滚动时域更新。
+**可解释资源动态调度**：当前 SOFA/占用状态 → CP-SAT → **滚动时域**再求解（每步用最新床旁状态）。
+
+这与 decision 的「早期预警」同属 ICU **实时决策**族，代码零耦合。
 
 ## 里程碑
 
 | 阶段 | 目标 | 交付物 |
 |------|------|--------|
 | **P0** ✓ | Demo 跑通 | ETL + SOFA + CP-SAT |
-| **P1** | 可解释 Demo | Streamlit 方案页 + 约束说明 |
-| **P2** | 标准接口 | MCP Tool `optimize_beds(state)` |
-| **P3** | 学习型策略 | PPO + 仿真环境 |
-| **P4** | 多目标扩展 | 等待时间、负荷均衡等可插拔目标 |
+| **P1** ✓ | 可解释 Demo | Streamlit + 约束说明 |
+| **P2** ✓ | 标准接口 | MCP `optimize_beds` |
+| **实时主线** ✓ | 滚动仿真 | `domain/rolling` + `application.simulate` |
+| **P3** | 学习型策略 | PPO 代码在 main；**默认 cp_sat**；无轨迹不宣称 online |
 
-## 扩展方向
+## 评测
 
-- **MCP**：对外暴露 `optimize_beds`，供任意 Agent 客户端调用
-- **容器化**：调度服务 + 配置热更新
+calib/eval 划分；simulate 滚动指标入 STATUS。禁止在无 MIMIC 轨迹时宣称 online PPO 已交付。
 
 ## 当前重点
 
-1. Streamlit 展示分配方案与 SOFA/目标约束说明
-2. B：SOFA→feat + simulate 指标（Issue #4）
-3. PR #3 已合 main：lambda + 合成 PPO；默认仍 cp_sat；MIMIC 轨迹另交
-4. MCP `optimize_beds` 骨架已合（`presentation/mcp_tools.py`）
-
+1. 滚动实时叙事与 STATUS 对齐
+2. 默认 `policy.default=cp_sat`
+3. MIMIC `sim` 轨迹（可选后续）

@@ -1,6 +1,6 @@
 ﻿# 项目状态
 
-> 更新：2026-07-31 · B 恢复新 dump + 真实 SOFA simulate 端到端 · 2026-07-27 Owner cap=1000/Streamlit/MLflow
+> 更新：2026-08-02 · **滚动时域实时调度**主叙事 · Wave2 SOFA simulate 数值保留
 
 ## 数据
 
