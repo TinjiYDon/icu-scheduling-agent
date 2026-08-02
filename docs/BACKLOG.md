@@ -42,5 +42,5 @@
 
 ## 基础设施
 
-- [ ] **#INF-1** A：pytest CI（模板见 `docs/CI_WORKFLOW.yml` · 需 workflow scope 启用）
+- [x] **#INF-1** A：pytest CI（`.github/workflows/ci.yml` ✅）
 - [x] **#INF-2** C：PR checklist（`.github/pull_request_template.md` ✅）
