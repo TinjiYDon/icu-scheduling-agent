@@ -23,20 +23,12 @@
 | 数据 | 真实 SOFA（20260727 dump）训练池 200 患者 × 20 床 |
 | 评估 | PPO 73.1 vs Greedy 73.6 vs CP-SAT 13/200（`reports/ppo_evaluation.json`）|
 
-## 三、如何在面板接入 PPO（供 C 参考）
+## 三、面板接入状态
 
-面板当前**默认 CP-SAT**，未接 PPO。接入建议：
+运行台（`presentation/ui/ops.py`）已支持 `CP-SAT / PPO` 策略切换：
 
-**方案 A（推荐）**：运行台（`presentation/ui/ops.py`）加「策略选择」radio `CP-SAT / PPO`：
-```python
-if policy == "ppo":
-    result = run_ppo()          # application/run_ppo.py → predict_assignments
-    # 展示 result["assignments"] / result["total_reward"] / reward_components
-else:
-    payload = run_simulation_with_plan(n_steps=n_steps)  # 现状 CP-SAT
-```
-
-**方案 B**：给 `run_simulation_with_plan()` 加 `policy` 参数，L4 层分流。
+- `CP-SAT`：继续走 `run_simulation_with_plan(n_steps=n_steps)`，保留滚动图、历史表和解释文本。
+- `PPO`：走 `application/run_ppo.py` → `predict_assignments()`，展示分配结果、总奖励和 reward 分解。
 
 命令行验证（不依赖面板）：
 ```powershell
