@@ -36,10 +36,8 @@
 
 | # | 任务 | 说明 | 阻塞/前置 |
 |:-:|------|------|:--:|
-| 7 | ~~λ 完整 256 组合~~ | ✅ 2026-08-02 跑完，Pareto 9 解，推荐 w0.5/o0.1/b0.1/z0.1 | — |
-| 8 | λ 推荐值确认 | 队友 C 确认 6 场景后再写回 `optimizer.yaml` | 队友 |
-| 9 | ~~λ eval 验证~~ | ✅ 2026-08-02 eval 30% 验证通过（无过拟合，指标优于 calib）| — |
-| 10 | S4-1 PPO | 保持 Draft PR #3，训 PPO 对比 CP-SAT（不进 main）| — |
+| 11 | PPO 深入对比 | 统一评估场景（PPO/CP-SAT 同候选规模）+ 多 episode 评估 | 队友确认 |
+| 12 | λ 推荐值确认 | 队友 C 确认 6 场景后再写回 `optimizer.yaml` | 队友 |
 
 ## 📌 队友待完成
 
@@ -59,7 +57,8 @@
 - 滚动时域仿真 `rolling/engine.py`
 - calib/eval split 限制求解（70/30, seed=42）
 - 业务指标 13 项（含 unassigned/high_risk_waiting/avg_assigned_sofa/资源利用率）
-- λ 网格搜索（quick 16 组 → `reports/lambda_tuning_*.csv|json`）
+- λ 网格搜索（quick 16 组 + 完整 256 组 → `reports/lambda_tuning_*.csv|json`）
+- PPO 训练（200K 步，`artifacts/ppo_icu.zip` + `reports/ppo_evaluation.json`）
 - 候选排序 tiebreaker + .gitattributes 统一 LF（可复现）
 
 ---
