@@ -34,4 +34,19 @@ def train_ppo(total_timesteps: int | None = None, model_path: str | None = None)
 
 
 if __name__ == "__main__":
-    print(train_ppo())
+    import argparse
+
+    parser = argparse.ArgumentParser(description="训练 MaskablePPO ICU 调度策略")
+    parser.add_argument(
+        "--timesteps",
+        type=int,
+        default=None,
+        help="覆盖 optimizer.yaml 的 total_timesteps（如小规模试训 20000）",
+    )
+    parser.add_argument(
+        "--model-path",
+        default=None,
+        help="模型保存路径（默认 artifacts/ppo_icu）",
+    )
+    args = parser.parse_args()
+    print(train_ppo(total_timesteps=args.timesteps, model_path=args.model_path))
