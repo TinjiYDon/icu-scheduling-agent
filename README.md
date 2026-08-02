@@ -21,14 +21,15 @@ $env:PYTHONPATH = (Get-Location)
 | 文档 | 说明 |
 |------|------|
 | [docs/PROJECT_GUIDE.md](docs/PROJECT_GUIDE.md) | 架构、流程、命令 |
-| [docs/DATA_LOCAL.md](docs/DATA_LOCAL.md) | MIMIC / dump 本地配置 |
-| [docs/TODO_OWNER.md](docs/TODO_OWNER.md) | 成员 C 集成待办 |
+| [docs/DUMP_READY.md](docs/DUMP_READY.md) | **线下 dump 单发 / restore** |
+| [docs/TUNING_LOCAL.md](docs/TUNING_LOCAL.md) | Plotly Ops 台启动 |
+| [docs/STATUS.md](docs/STATUS.md) | 当前进度 |
 | [docs/README.md](docs/README.md) | 文档索引 |
 
 ## 架构
 
 ```
-MIMIC (Layer0) → ETL → SOFA → CP-SAT/PPO → Streamlit
+MIMIC (Layer0) → ETL → SOFA → CP-SAT（滚动） → Streamlit Ops
 ```
 
 ## Docker（可选）
@@ -37,10 +38,12 @@ MIMIC (Layer0) → ETL → SOFA → CP-SAT/PPO → Streamlit
 docker compose up -d   # PostgreSQL 端口 5434
 ```
 
-## 仿真与演示
+## 仿真与演示（Plotly Ops）
 
 ```powershell
-python -m application.simulate
-streamlit run presentation/streamlit_app.py
+$env:PYTHONPATH = (Get-Location)
+.\.venv\Scripts\python.exe -m application.simulate
+.\.venv\Scripts\python.exe -m streamlit run presentation/streamlit_app.py --server.port 8502
 ```
 
+线下 dump：**不入 Git**，见 [`docs/DUMP_READY.md`](docs/DUMP_READY.md)。页面：Ops / Accept。默认策略 `cp_sat`（无 MIMIC PPO 轨迹时勿宣称 online RL）。
