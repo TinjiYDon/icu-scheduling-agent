@@ -40,7 +40,7 @@ def fig_occupancy_timeline(history: Sequence[dict[str, Any]]) -> go.Figure:
         secondary_y=True,
     )
     fig.update_layout(
-        title="Rolling occupancy & flow",
+        title="滚动占用与入出转",
         barmode="group",
         height=360,
         margin=dict(l=40, r=40, t=48, b=40),
@@ -49,9 +49,9 @@ def fig_occupancy_timeline(history: Sequence[dict[str, Any]]) -> go.Figure:
         font=dict(color=SLATE),
         legend=dict(orientation="h", y=1.12),
     )
-    fig.update_xaxes(title_text="step", gridcolor="#e2e8f0")
-    fig.update_yaxes(title_text="occupied beds", secondary_y=False, gridcolor="#e2e8f0")
-    fig.update_yaxes(title_text="admit / discharge", secondary_y=True)
+    fig.update_xaxes(title_text="步", gridcolor="#e2e8f0")
+    fig.update_yaxes(title_text="在床数", secondary_y=False, gridcolor="#e2e8f0")
+    fig.update_yaxes(title_text="入院 / 出院", secondary_y=True)
     return fig
 
 
@@ -65,16 +65,16 @@ def fig_occupancy_heatmap(history: Sequence[dict[str, Any]], n_beds: int) -> go.
         data=go.Heatmap(
             z=[rates],
             x=steps,
-            y=["utilization %"],
+            y=["利用率 %"],
             colorscale=[[0, "#ecfdf5"], [0.5, "#5eead4"], [1, "#0f766e"]],
             zmin=0,
             zmax=100,
-            hovertemplate="step=%{x}<br>util=%{z:.1f}%<extra></extra>",
+            hovertemplate="步=%{x}<br>利用率=%{z:.1f}%<extra></extra>",
             colorbar=dict(title="%"),
         )
     )
     fig.update_layout(
-        title="Bed utilization heatmap (by rolling step)",
+        title="床位利用率热力（按滚动步）",
         height=180,
         margin=dict(l=40, r=20, t=48, b=40),
         paper_bgcolor="rgba(0,0,0,0)",

@@ -14,8 +14,8 @@ STATUS = Path(__file__).resolve().parents[2] / "docs" / "STATUS.md"
 
 
 def render_accept() -> None:
-    st.title("Acceptance gates")
-    st.caption("Layer1 SOFA / staging counts + last simulation KPIs")
+    st.title("验收门禁")
+    st.caption("Layer1 SOFA / staging 行数 + 最近一次仿真 KPI")
 
     try:
         engine = get_engine()
@@ -25,16 +25,16 @@ def render_accept() -> None:
                 conn.execute(text("SELECT COUNT(*) FROM feat.sofa_timeseries")).scalar_one()
             )
         g1, g2, g3 = st.columns(3)
-        g1.metric("staging.icustays", f"{stays:,}")
-        g2.metric("feat.sofa_timeseries", f"{sofa:,}")
+        g1.metric("住院数", f"{stays:,}")
+        g2.metric("SOFA 行数", f"{sofa:,}")
         ok = stays >= 94458 * 0.99 and sofa >= 94458 * 0.99
-        g3.metric("gate", "pass" if ok else "fail")
+        g3.metric("门禁", "通过" if ok else "失败")
         if ok:
-            st.success("Row-count gate passed (~94,458)")
+            st.success("行数门禁通过（约 94,458）")
         else:
-            st.error("Restore icu_scheduling_P0-full_*20260802.dump")
+            st.error("请 restore icu_scheduling_P0-full_*20260802.dump")
     except Exception as exc:  # noqa: BLE001
-        st.error(f"Layer1 query failed: {exc}")
+        st.error(f"无法查询 Layer1：{exc}")
 
     payload = st.session_state.get("last_sim_payload")
     if payload:

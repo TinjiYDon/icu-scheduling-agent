@@ -21,25 +21,25 @@ def _sidebar_controls() -> int:
     opt = load_yaml("optimizer.yaml")
     resources = dict(opt.get("resources") or {})
     solver = dict(opt.get("solver") or {})
-    st.sidebar.markdown("### Solver")
+    st.sidebar.markdown("### 求解器")
     n_beds = st.sidebar.number_input(
-        "n_beds", min_value=1, max_value=200, value=int(resources.get("n_beds", 20))
+        "床位数 n_beds", min_value=1, max_value=200, value=int(resources.get("n_beds", 20))
     )
     cand = st.sidebar.number_input(
-        "candidate_cap",
+        "候选上限 candidate_cap",
         min_value=20,
         max_value=20000,
         value=int(solver.get("candidate_cap", 1000)),
-        help="Caps CP-SAT candidates only",
+        help="只限制 CP-SAT 候选，不删 SOFA/数据",
     )
     tmax = st.sidebar.number_input(
-        "max_time_seconds",
+        "最大求解秒数",
         min_value=10,
         max_value=600,
         value=int(solver.get("max_time_seconds", 180)),
     )
-    n_steps = st.sidebar.number_input("rolling n_steps", min_value=1, max_value=48, value=12)
-    if st.sidebar.button("Save config"):
+    n_steps = st.sidebar.number_input("滚动步数 n_steps", min_value=1, max_value=48, value=12)
+    if st.sidebar.button("保存配置", type="primary"):
         opt["resources"] = {**resources, "n_beds": int(n_beds)}
         opt["solver"] = {
             **solver,
@@ -50,19 +50,19 @@ def _sidebar_controls() -> int:
             yaml.safe_dump(opt, allow_unicode=True, sort_keys=False),
             encoding="utf-8",
         )
-        st.sidebar.success("Saved optimizer.yaml")
+        st.sidebar.success("已保存 optimizer.yaml")
     return int(n_steps)
 
 
 def _kpi_row(sim: dict, plan: dict) -> None:
     m = plan.get("metrics") or {}
     items = [
-        ("solver", m.get("solver_status", sim.get("solver_status", "—"))),
-        ("beds", m.get("n_beds", sim.get("n_beds", "—"))),
-        ("assigned", m.get("assigned", sim.get("assigned", "—"))),
-        ("occupancy", f"{sim.get('final_occupancy', '—')}/{sim.get('n_beds', '—')}"),
-        ("util %", sim.get("bed_utilization_pct", "—")),
-        ("candidates", m.get("n_stays", sim.get("n_stays", "—"))),
+        ("求解状态", m.get("solver_status", sim.get("solver_status", "—"))),
+        ("床位数", m.get("n_beds", sim.get("n_beds", "—"))),
+        ("已分配", m.get("assigned", sim.get("assigned", "—"))),
+        ("最终占用", f"{sim.get('final_occupancy', '—')}/{sim.get('n_beds', '—')}"),
+        ("利用率%", sim.get("bed_utilization_pct", "—")),
+        ("候选数", m.get("n_stays", sim.get("n_stays", "—"))),
     ]
     cols = st.columns(len(items))
     for col, (lbl, val) in zip(cols, items):
@@ -70,8 +70,8 @@ def _kpi_row(sim: dict, plan: dict) -> None:
 
 
 def render_ops() -> None:
-    st.title("ICU Bed Ops Console")
-    st.caption("CP-SAT assignment + rolling-horizon occupancy · Plotly views")
+    st.title("ICU 床位调度 · 运行台")
+    st.caption("CP-SAT 分配 + 滚动占用 · Plotly 可视化")
 
     n_steps = _sidebar_controls()
     if "last_sim_payload" not in st.session_state:
@@ -79,16 +79,16 @@ def render_ops() -> None:
 
     run_col, _ = st.columns([1, 3])
     with run_col:
-        run = st.button("Run CP-SAT + rolling", type="primary", use_container_width=True)
+        run = st.button("运行 CP-SAT + 滚动仿真", type="primary", use_container_width=True)
 
     if run:
-        with st.spinner("SOFA → CP-SAT → rolling…"):
+        with st.spinner("SOFA → CP-SAT → 滚动仿真…"):
             payload = run_simulation_with_plan(n_steps=n_steps)
         st.session_state.last_sim_payload = payload
         st.success(
-            f"run_id={payload['plan'].get('run_id')} · "
-            f"solver={payload['simulate'].get('solver_status')} · "
-            f"mlflow={payload['simulate'].get('mlflow_run_id', 'skip')}"
+            f"完成 · run_id={payload['plan'].get('run_id')} · "
+            f"求解={payload['simulate'].get('solver_status')} · "
+            f"mlflow={payload['simulate'].get('mlflow_run_id', '跳过')}"
         )
 
     payload = st.session_state.last_sim_payload
@@ -108,18 +108,18 @@ def render_ops() -> None:
                 )
             with c2:
                 st.plotly_chart(fig_sofa_avg(hist), use_container_width=True)
-            with st.expander("history table"):
+            with st.expander("滚动历史表"):
                 st.dataframe(pd.DataFrame(hist), use_container_width=True, hide_index=True)
         rows = plan.get("assignments") or []
         if rows:
-            st.subheader("Bed assignments")
+            st.subheader("床位分配结果")
             st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
-        with st.expander("simulate JSON"):
+        with st.expander("仿真 JSON"):
             st.json(sim)
     else:
         plan = get_plan()
         if plan.get("status") == "ok" and plan.get("assignments"):
-            st.info(f"Cached plan {plan.get('run_id')} — run again for rolling charts")
+            st.info(f"已有方案 {plan.get('run_id')} — 再点运行可刷新滚动图")
             _kpi_row({}, plan)
             st.dataframe(
                 pd.DataFrame(plan["assignments"]),
@@ -127,6 +127,6 @@ def render_ops() -> None:
                 hide_index=True,
             )
         else:
-            st.info("Click **Run CP-SAT + rolling** to populate the ops dashboard.")
+            st.info("点击 **运行 CP-SAT + 滚动仿真** 生成看板。")
 
     disclaimer()
