@@ -2,7 +2,7 @@
 
 import pytest
 
-from domain.optimizer.cp_sat import run_assignment
+from domain.optimizer.cp_sat import _resolve_bed_zones, run_assignment
 
 
 class _FakeResult:
@@ -117,6 +117,18 @@ def test_split_calib_eval_disjoint_and_meta(fake_db):
     calib_ids = {a["stay_id"] for a in calib["top_assignments"]}
     eval_ids = {a["stay_id"] for a in ev["top_assignments"]}
     assert calib_ids.isdisjoint(eval_ids)
+
+
+def test_bed_zones_clipped_for_any_n_beds():
+    """n_beds must be tunable: zone maps never exceed available beds."""
+    cfg = [[1, 4, "ISO"], [5, 4, "MICU"], [9, 4, "SICU"], [13, 4, "CCU"], [17, 4, "NICU"]]
+    for nb in range(1, 41):
+        label, start, count = _resolve_bed_zones(nb, cfg)
+        for bed in label:
+            assert 1 <= bed <= nb
+        for zone, s in start.items():
+            assert s <= nb
+            assert s + count[zone] - 1 <= nb
 
 
 def test_evaluation_has_business_metrics(fake_db):

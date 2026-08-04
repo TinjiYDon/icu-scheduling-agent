@@ -109,7 +109,8 @@ def _style_high_sofa(df: pd.DataFrame) -> pd.DataFrame:
 def _run_selected_policy(policy: str, n_steps: int) -> dict:
     if policy == "ppo":
         return {"policy": "ppo", "ppo": run_ppo()}
-    return {"policy": "cp_sat", "simulate": run_simulation_with_plan(n_steps=n_steps)}
+    payload = run_simulation_with_plan(n_steps=n_steps)
+    return {"policy": "cp_sat", **payload}
 
 
 def _render_ppo_result(result: dict) -> None:

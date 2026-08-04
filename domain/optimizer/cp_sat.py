@@ -95,6 +95,34 @@ def _objective_coefficient(
     return max(1, round(weight * scale / max(int(upper_bound), 1)))
 
 
+def _resolve_bed_zones(
+    n_beds: int, bed_zones_cfg: object | None = None
+) -> tuple[dict[int, str], dict[str, int], dict[str, int]]:
+    """Build bed→zone maps clipped to n_beds (beds are 1-indexed 1..n_beds).
+
+    The default bed_zones layout assumes a 20-bed unit. When n_beds differs,
+    zones are clipped so every lookup stays within 0..n_beds-1 (no KeyError).
+    Zones falling entirely beyond n_beds are dropped.
+    """
+    cfg = bed_zones_cfg or [
+        [1, 4, "ISO"], [5, 4, "MICU"], [9, 4, "SICU"], [13, 4, "CCU"], [17, 4, "NICU"],
+    ]
+    label: dict[int, str] = {}
+    start: dict[str, int] = {}
+    count: dict[str, int] = {}
+    for raw_start, raw_count, zone in cfg:
+        zone_start = int(raw_start)
+        zone_count = int(raw_count)
+        if zone_start > n_beds:
+            continue  # zone entirely beyond available beds
+        zone_end = min(zone_start + zone_count, n_beds + 1)
+        start[zone] = zone_start
+        count[zone] = max(0, zone_end - zone_start)
+        for bed in range(zone_start, zone_end):
+            label[bed] = zone
+    return label, start, count
+
+
 def run_assignment(
     run_id: str | None = None,
     lambda_weights: Mapping[str, float] | None = None,
@@ -144,22 +172,18 @@ def run_assignment(
     opt = load_yaml("optimizer.yaml")
     lam = _resolve_lambda_weights(opt.get("lambda", {}), lambda_weights)
     n_beds = int(opt.get("resources", {}).get("n_beds", 20))
-    n_iso_beds = int(opt.get("resources", {}).get("n_isolation_beds", 4))
+    n_iso_beds = min(int(opt.get("resources", {}).get("n_isolation_beds", 4)), n_beds)
     n_vents = int(opt.get("resources", {}).get("n_ventilators", 8))
     max_patients = int(opt.get("resources", {}).get("max_patients", n_beds * 10))
     bed_zones_cfg = opt.get("resources", {}).get(
         "bed_zones",
         [[1, 4, "ISO"], [5, 4, "MICU"], [9, 4, "SICU"], [13, 4, "CCU"], [17, 4, "NICU"]],
     )
-    # Build bed_id → zone_label lookup (bed_id is 1-indexed)
-    bed_zone_label: dict[int, str] = {}
-    bed_zone_start: dict[str, int] = {}
-    bed_zone_count: dict[str, int] = {}
-    for start, count, label in bed_zones_cfg:
-        for b in range(start, start + count):
-            bed_zone_label[b] = label
-        bed_zone_start[label] = start
-        bed_zone_count[label] = count
+    # Build bed_id → zone_label lookup (bed_id is 1-indexed), clipped to n_beds
+    # so n_beds can be tuned freely without KeyError on zone bounds.
+    bed_zone_label, bed_zone_start, bed_zone_count = _resolve_bed_zones(
+        n_beds, bed_zones_cfg
+    )
     run_id = run_id or f"p0_{uuid.uuid4().hex[:8]}"
 
     # ── 1. Load patients ──────────────────────────────────────────
@@ -302,7 +326,7 @@ def run_assignment(
     zone_load_vars = []
     for z in range(4):
         start = z * zone_size
-        end = start + zone_size if z < 3 else n_beds
+        end = min(start + zone_size if z < 3 else n_beds, n_beds)
         zl = model.NewIntVar(0, zone_size, f"zone_load_{z}")
         model.Add(zl == sum(x[i, b] for i in range(n) for b in range(start, end)))
         zone_load_vars.append(zl)
