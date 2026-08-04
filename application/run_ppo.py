@@ -15,7 +15,7 @@ def run_ppo(model_path: str | None = None) -> dict:
     env = build_icu_env()
     path = model_path or ppo.get("model_path", "artifacts/ppo_icu")
     model = load_model(path, env=env)
-    return predict_assignments(model, env, seed=int(ppo.get("seed", 42)))
+    return predict_assignments(model, env, seed=int(ppo.get("seed", 42)), policy_name="ppo")
 
 
 if __name__ == "__main__":

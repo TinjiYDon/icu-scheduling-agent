@@ -30,6 +30,7 @@
 | 5 | λ 网格搜索（quick + 完整 256）| quick 16 组 + 完整 256 组 calib 实验 + eval 验证，推荐值待队友确认 | 08-01/02 |
 | 6 | 可解释输出 | `explain.py` CLI + 队友 v4 面板 plan["explain"] 接入 | 08-01 |
 | 7 | PPO 训练 | 完整 200K 步，`artifacts/ppo_icu.zip`，评估 PPO≈Greedy | 08-02 |
+| 8 | PPO 深入对比 | `application/evaluate_ppo_benchmark.py` 同候选规模多 episode 评估 | 08-04 |
 
 ---
 
@@ -37,7 +38,6 @@
 
 | # | 任务 | 说明 | 阻塞/前置 |
 |:-:|------|------|:--:|
-| 11 | PPO 深入对比 | 统一评估场景（PPO/CP-SAT 同候选规模）+ 多 episode 评估 | 队友确认 |
 | 12 | λ 推荐值确认 | 队友 C 确认 6 场景后再写回 `optimizer.yaml` | 队友 |
 
 ## 📌 队友待完成

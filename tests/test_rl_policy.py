@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from domain.rl.env import Bed, ICUEnv, Patient
+from domain.rl.evaluation import evaluate_greedy
 from domain.rl.policy import predict_assignments
 
 
@@ -23,3 +24,24 @@ def test_policy_inference_returns_common_assignment_shape():
     assert result["policy"] == "ppo"
     assert result["assigned"] == 1
     assert result["assignments"] == [{"stay_id": 1, "bed_id": 1, "zone": "REG"}]
+
+
+def test_policy_name_can_be_overridden_and_greedy_is_labeled():
+    env = ICUEnv(
+        patients=[Patient(1, 2.0)],
+        beds=[Bed(1, has_ventilator=True)],
+        ventilator_capacity=1,
+    )
+
+    custom = predict_assignments(FirstValidModel(), env, seed=42, policy_name="demo")
+    greedy = evaluate_greedy(
+        ICUEnv(
+            patients=[Patient(1, 2.0)],
+            beds=[Bed(1, has_ventilator=True)],
+            ventilator_capacity=1,
+        ),
+        seed=42,
+    )
+
+    assert custom["policy"] == "demo"
+    assert greedy["policy"] == "greedy"

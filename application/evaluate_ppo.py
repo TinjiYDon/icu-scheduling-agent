@@ -20,7 +20,7 @@ def evaluate_ppo(model_path: str | None = None) -> dict:
 
     ppo_env = build_icu_env()
     model = load_model(path, env=ppo_env)
-    ppo_result = predict_assignments(model, ppo_env, seed=seed)
+    ppo_result = predict_assignments(model, ppo_env, seed=seed, policy_name="ppo")
     greedy_result = evaluate_greedy(build_icu_env(), seed=seed)
     cp_sat_result = run_assignment(run_id="evaluation_cp_sat")
 

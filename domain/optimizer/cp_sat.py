@@ -11,7 +11,7 @@ import math
 from typing import Mapping
 
 from ortools.sat.python import cp_model
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
 from infra.config import load_yaml
 from infra.db import get_engine
@@ -101,6 +101,7 @@ def run_assignment(
     *,
     persist: bool = True,
     split: str | None = None,
+    stay_ids: list[int] | None = None,
 ) -> dict:
     """Run CP-SAT bed assignment.
 
@@ -110,9 +111,36 @@ def run_assignment(
         persist: whether to write assignments into sched.assignments.
         split: restrict candidates to "calib" (70% tuning) or "eval" (30%
             report-only) per eval_split config. None = all candidates.
+        stay_ids: optional explicit candidate stay IDs for matched comparisons.
     """
     if split is not None and split not in ("calib", "eval"):
         raise ValueError("split must be 'calib', 'eval' or None")
+    if stay_ids is not None and len(stay_ids) == 0:
+        return {
+            "run_id": run_id or f"p0_{uuid.uuid4().hex[:8]}",
+            "assigned": 0,
+            "n_beds": int(load_yaml("optimizer.yaml").get("resources", {}).get("n_beds", 20)),
+            "n_stays": 0,
+            "lambda": _resolve_lambda_weights(load_yaml("optimizer.yaml").get("lambda", {}), lambda_weights),
+            "split": split,
+            "split_meta": None,
+            "status": "empty",
+            "evaluation": {
+                "assignment_rate": 0.0,
+                "priority_total": 0.0,
+                "avg_assigned_priority": 0.0,
+                "high_risk_assigned_rate": 1.0,
+                "overload_penalty": 0,
+                "balance_deviation": 0,
+                "zone_match_rate": 0.0,
+                "solve_time_seconds": 0.0,
+                "unassigned": 0,
+                "high_risk_waiting": 0,
+                "avg_assigned_sofa": 0.0,
+                "isolation_utilization": 0.0,
+                "ventilator_utilization": 0.0,
+            },
+        }
     opt = load_yaml("optimizer.yaml")
     lam = _resolve_lambda_weights(opt.get("lambda", {}), lambda_weights)
     n_beds = int(opt.get("resources", {}).get("n_beds", 20))
@@ -137,21 +165,38 @@ def run_assignment(
     # ── 1. Load patients ──────────────────────────────────────────
     engine = get_engine()
     with engine.connect() as conn:
-        rows = conn.execute(
-            text(
-                """
-                SELECT s.stay_id, COALESCE(p.priority_weight, 1.0) AS priority_weight,
-                       COALESCE(so.sofa_total, 0) AS sofa_total,
-                       s.first_careunit
-                FROM staging.icustays s
-                LEFT JOIN feat.patient_priority p ON s.stay_id = p.stay_id
-                LEFT JOIN feat.sofa_timeseries so ON s.stay_id = so.stay_id AND so.hour_index = 0
-                ORDER BY priority_weight DESC, sofa_total DESC, s.stay_id
-                LIMIT :max_patients
-                """
-            ),
-            {"max_patients": max_patients},
-        ).mappings().all()
+        if stay_ids is not None:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT s.stay_id, COALESCE(p.priority_weight, 1.0) AS priority_weight,
+                           COALESCE(so.sofa_total, 0) AS sofa_total,
+                           s.first_careunit
+                    FROM staging.icustays s
+                    LEFT JOIN feat.patient_priority p ON s.stay_id = p.stay_id
+                    LEFT JOIN feat.sofa_timeseries so ON s.stay_id = so.stay_id AND so.hour_index = 0
+                    WHERE s.stay_id IN :stay_ids
+                    ORDER BY priority_weight DESC, sofa_total DESC, s.stay_id
+                    """
+                ).bindparams(bindparam("stay_ids", expanding=True)),
+                {"stay_ids": [int(stay_id) for stay_id in stay_ids]},
+            ).mappings().all()
+        else:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT s.stay_id, COALESCE(p.priority_weight, 1.0) AS priority_weight,
+                           COALESCE(so.sofa_total, 0) AS sofa_total,
+                           s.first_careunit
+                    FROM staging.icustays s
+                    LEFT JOIN feat.patient_priority p ON s.stay_id = p.stay_id
+                    LEFT JOIN feat.sofa_timeseries so ON s.stay_id = so.stay_id AND so.hour_index = 0
+                    ORDER BY priority_weight DESC, sofa_total DESC, s.stay_id
+                    LIMIT :max_patients
+                    """
+                ),
+                {"max_patients": max_patients},
+            ).mappings().all()
 
     stays = [dict(r) for r in rows]
 

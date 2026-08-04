@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
 from domain.optimizer.cp_sat import _careunit_zone, _needs_ventilator, _zone_label
 from domain.rl.env import Bed, Patient
@@ -10,27 +10,46 @@ from infra.config import load_yaml
 from infra.db import get_engine
 
 
-def load_patients(limit: int | None = None) -> list[Patient]:
+def load_patients(
+    limit: int | None = None,
+    stay_ids: list[int] | None = None,
+) -> list[Patient]:
     config = load_yaml("optimizer.yaml")
     max_patients = limit or int(config.get("ppo", {}).get("candidate_patients", 20))
+    if stay_ids is not None:
+        query = text(
+            """
+            SELECT s.stay_id,
+                   COALESCE(p.priority_weight, 1.0) AS priority_weight,
+                   COALESCE(so.sofa_total, 0) AS sofa_total,
+                   s.first_careunit
+            FROM staging.icustays s
+            LEFT JOIN feat.patient_priority p ON p.stay_id = s.stay_id
+            LEFT JOIN feat.sofa_timeseries so
+              ON so.stay_id = s.stay_id AND so.hour_index = 0
+            WHERE s.stay_id IN :stay_ids
+            ORDER BY priority_weight DESC, sofa_total DESC, s.stay_id
+            """
+        ).bindparams(bindparam("stay_ids", expanding=True))
+        params: dict[str, object] = {"stay_ids": [int(stay_id) for stay_id in stay_ids]}
+    else:
+        query = text(
+            """
+            SELECT s.stay_id,
+                   COALESCE(p.priority_weight, 1.0) AS priority_weight,
+                   COALESCE(so.sofa_total, 0) AS sofa_total,
+                   s.first_careunit
+            FROM staging.icustays s
+            LEFT JOIN feat.patient_priority p ON p.stay_id = s.stay_id
+            LEFT JOIN feat.sofa_timeseries so
+              ON so.stay_id = s.stay_id AND so.hour_index = 0
+            ORDER BY priority_weight DESC, sofa_total DESC, s.stay_id
+            LIMIT :limit
+            """
+        )
+        params = {"limit": max_patients}
     with get_engine().connect() as connection:
-        rows = connection.execute(
-            text(
-                """
-                SELECT s.stay_id,
-                       COALESCE(p.priority_weight, 1.0) AS priority_weight,
-                       COALESCE(so.sofa_total, 0) AS sofa_total,
-                       s.first_careunit
-                FROM staging.icustays s
-                LEFT JOIN feat.patient_priority p ON p.stay_id = s.stay_id
-                LEFT JOIN feat.sofa_timeseries so
-                  ON so.stay_id = s.stay_id AND so.hour_index = 0
-                ORDER BY priority_weight DESC, sofa_total DESC, s.stay_id
-                LIMIT :limit
-                """
-            ),
-            {"limit": max_patients},
-        ).mappings().all()
+        rows = connection.execute(query, params).mappings().all()
     return [patient_from_row(dict(row)) for row in rows]
 
 

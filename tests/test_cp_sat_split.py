@@ -27,7 +27,12 @@ class _FakeConn:
         return False
 
     def execute(self, *args, **kwargs):
-        return _FakeResult(self._rows)
+        params = kwargs or (args[1] if len(args) > 1 else {})
+        stay_ids = params.get("stay_ids") if isinstance(params, dict) else None
+        if stay_ids is None:
+            return _FakeResult(self._rows)
+        allowed = {int(stay_id) for stay_id in stay_ids}
+        return _FakeResult([row for row in self._rows if row["stay_id"] in allowed])
 
 
 class _FakeEngine:
@@ -90,6 +95,13 @@ def test_split_none_uses_all_candidates(fake_db):
     assert out["n_stays"] == 100
     assert out["split"] is None
     assert out["split_meta"] is None
+
+
+def test_stay_ids_filter_limits_candidates(fake_db):
+    out = run_assignment(stay_ids=[3, 5, 7], persist=False)
+
+    assert out["n_stays"] == 3
+    assert {row["stay_id"] for row in out["top_assignments"]}.issubset({3, 5, 7})
 
 
 def test_split_calib_eval_disjoint_and_meta(fake_db):

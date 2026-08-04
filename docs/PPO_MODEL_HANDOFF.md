@@ -36,7 +36,10 @@
 $env:PYTHONPATH = (Get-Location)
 .\.venv\Scripts\python.exe -m application.run_ppo       # PPO 推理
 .\.venv\Scripts\python.exe -m application.evaluate_ppo  # PPO vs Greedy vs CP-SAT
+.\.venv\Scripts\python.exe -m application.evaluate_ppo_benchmark --episodes 5
 ```
+
+> 备注：`evaluate_ppo_benchmark` 会让 PPO / Greedy / CP-SAT 在同一批 `candidate_stay_ids` 上重复评估，适合做“深入对比”验收。
 
 ## 四、注意事项
 
