@@ -13,10 +13,42 @@ $ErrorActionPreference = "Stop"
 if (-not (Test-Path $DumpFile)) { throw "Dump not found: $DumpFile" }
 
 $db = "icu_scheduling"
-$pgRestore = "pg_restore"
-if (Test-Path "C:\Program Files\PostgreSQL\16\bin\pg_restore.exe") {
-    $pgRestore = "C:\Program Files\PostgreSQL\16\bin\pg_restore.exe"
+$pgRestore = $null
+# 1) Prefer pg_restore on PATH (user configured env, or standard install)
+$cmdOnPath = Get-Command pg_restore -ErrorAction SilentlyContinue
+if ($cmdOnPath) { $pgRestore = $cmdOnPath.Source }
+# 2) Discover PostgreSQL installations from Windows registry
+if (-not $pgRestore) {
+    $regKeys = @(
+        "HKLM:\SOFTWARE\PostgreSQL\Installations\*",
+        "HKLM:\SOFTWARE\WOW6432Node\PostgreSQL\Installations\*"
+    )
+    foreach ($key in $regKeys) {
+        $items = Get-ItemProperty $key -ErrorAction SilentlyContinue
+        foreach ($item in $items) {
+            if ($item.BaseDirectory) {
+                $candidate = Join-Path $item.BaseDirectory "bin\pg_restore.exe"
+                if (Test-Path $candidate) { $pgRestore = $candidate; break }
+            }
+        }
+        if ($pgRestore) { break }
+    }
 }
+# 3) Fallback: well-known default Program Files locations (PG 15/16/17)
+if (-not $pgRestore) {
+    $fallbacks = @(
+        "C:\Program Files\PostgreSQL\17\bin\pg_restore.exe",
+        "C:\Program Files\PostgreSQL\16\bin\pg_restore.exe",
+        "C:\Program Files\PostgreSQL\15\bin\pg_restore.exe",
+        "C:\Program Files (x86)\PostgreSQL\17\bin\pg_restore.exe",
+        "C:\Program Files (x86)\PostgreSQL\16\bin\pg_restore.exe"
+    )
+    foreach ($candidate in $fallbacks) {
+        if (Test-Path $candidate) { $pgRestore = $candidate; break }
+    }
+}
+# 4) Last resort: bare "pg_restore" (will fail with clear error if not on PATH)
+if (-not $pgRestore) { $pgRestore = "pg_restore" }
 
 $env:PGPASSWORD = $PgPassword
 Write-Host "Restoring $DumpFile -> $db on ${PgHost}:${PgPort}"
