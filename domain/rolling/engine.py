@@ -81,7 +81,7 @@ def run_rolling_simulation(
     for step in range(1, n_steps + 1):
         _deterministic_seed(step)
 
-        # 2a. Discharge some patients
+        # 2a. Discharge some patients (fixed fraction per step)
         n_discharge = max(1, int(len(occupied) * discharge_rate))
         n_discharge = min(n_discharge, len(occupied))
         if n_discharge > 0 and occupied:
@@ -114,31 +114,35 @@ def run_rolling_simulation(
                     newly_admitted += 1
             total_admissions += newly_admitted
 
-        # 2c. Run CP-SAT to optimize current assignment
-        # Rebuild candidate pool: currently occupied + top of queue
+        # 2c. Re-optimize with CP-SAT every step (keep patients stable via move penalty)
         candidate_ids = [occ["stay_id"] for occ in occupied.values()]
-        # Add some from queue
         candidate_ids += [p["stay_id"] for p in queue[:max_patients(n_beds)]]
-        candidate_ids = list(set(candidate_ids))  # dedup
-        free_slots = n_beds - len(occupied)
-
-        # Simple re-optimization: if free slots, fill from queue
-        if free_slots > 0 and queue:
-            for p in queue[:free_slots]:
-                if free_slots <= 0:
-                    break
-                for b in range(1, n_beds + 1):
-                    if b not in occupied:
-                        occupied[b] = {
-                            "stay_id": p["stay_id"],
-                            "weight": float(p.get("w", 1.0)),
-                            "sofa": float(p.get("sofa", 0)),
-                            "zone": p.get("first_careunit") or "?",
-                            "steps_in_icu": 0,
-                        }
-                        queue = [x for x in queue if x["stay_id"] != p["stay_id"]]
-                        free_slots -= 1
-                        break
+        candidate_ids = list(dict.fromkeys(candidate_ids))  # dedup, keep order
+        occupied_beds_map = {occ["stay_id"]: bed for bed, occ in occupied.items()}
+        reopt = run_assignment(
+            stay_ids=candidate_ids,
+            occupied_beds=occupied_beds_map,
+            persist=False,
+        )
+        new_occupied: dict[int, dict] = {}
+        for a in reopt.get("top_assignments", []):
+            bed_id = a["bed_id"]
+            sid = a["stay_id"]
+            prev_bed = occupied_beds_map.get(sid)
+            steps = 0
+            if prev_bed is not None and prev_bed in occupied:
+                steps = occupied[prev_bed]["steps_in_icu"]
+            new_occupied[bed_id] = {
+                "stay_id": sid,
+                "weight": float(a["priority_weight"]),
+                "sofa": float(a["sofa_total"]),
+                "zone": a.get("bed_type", "?"),
+                "steps_in_icu": steps,
+            }
+        # Patients not assigned (or displaced) return to the queue
+        assigned_ids = {a["stay_id"] for a in reopt.get("top_assignments", [])}
+        queue = [p for p in queue if p["stay_id"] not in assigned_ids]
+        occupied = new_occupied
 
         # Increment stay duration
         for occ in occupied.values():

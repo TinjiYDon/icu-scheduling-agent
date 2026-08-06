@@ -1,6 +1,6 @@
 ﻿# 项目状态
 
-> 更新：2026-08-02 · **滚动时域实时调度**主叙事 · 演示台 v4（总览 + Ops 自动跑/可解释/KPI）· B 完成 calib/eval split + 业务指标 + λ 搜索 + PPO 训练
+> 更新：2026-08-06 · B 完成参数修复 + 每步 CP-SAT 重优化 + 呼吸机 SOFA 驱动 + 前端可解释优化 · 2026-08-02 演示台 v4 / λ / PPO
 
 ## 数据
 
@@ -26,12 +26,21 @@
 | 候选患者 avg_sofa | 11.8（危重优先，非全库均值）|
 | 平均权重 | 2.19 |
 
-## CP-SAT 增强（B · 2026-08-01）
+## CP-SAT 增强（B · 2026-08-01 → 08-06）
 
-- **calib/eval 子集限制**：`run_assignment(split="calib"|"eval")` · 70/30 · seed=42（[`eval_split.py`](`domain/optimizer/eval_split.py`)）
-- **业务指标 13 项**：新增 unassigned / high_risk_waiting / avg_assigned_sofa / isolation_utilization / ventilator_utilization
-- **可复现**：候选排序加 stay_id tiebreaker；`.gitattributes` 统一 LF
-- **可解释报告**：`python -m domain.optimizer.explain [--split ...]` + Streamlit 面板组件化展示
+- **calib/eval 子集限制**：`run_assignment(split="calib"|"eval")` · 70/30 · seed=42
+- **业务指标 13 项**：unassigned / high_risk_waiting / avg_assigned_sofa / 隔离与呼吸机利用率等
+- **可复现**：候选排序 tiebreaker + `.gitattributes` 统一 LF
+- **可解释**：`python -m domain.optimizer.explain` + 面板组件化展示
+
+### 08-06 新增
+
+- **`n_beds` 自由可调**：`bed_zones`/隔离床/均衡分区按 n_beds 裁剪（不再 KeyError）
+- **参数真实生效**：`candidate_cap`、`max_time_seconds` 由求解器读取（原为摆设/硬编码 30s）
+- **滚动每步真 CP-SAT 重优化**（`engine.py`）：替换贪心填充，加 **f5 挪床惩罚**（`lambda.move`）保持患者稳定
+- **呼吸机 SOFA 驱动**：SOFA≥10→90%、6-9→55%、<6→20%（替代纯随机 35%）
+- **前端可解释**：KPI 悬停 help、三图各占一行+中文解释+明确坐标轴、表格列含义说明
+- **改参数自动重跑**：侧栏参数变化（床位数/候选/秒数/步数/策略）自动触发重新求解
 
 ## λ 调参（B · 2026-08-02）
 
@@ -48,6 +57,12 @@
 | MLflow | `mlflow ui --backend-store-uri sqlite:///./mlflow.db` |
 | 说明 | [`TUNING_LOCAL.md`](TUNING_LOCAL.md) |
 | PPO smoke | [`PPO_SMOKE.md`](PPO_SMOKE.md) · 代码在 main · **默认 cp_sat** · 无 MIMIC 轨迹 |
+
+## 数据限制（2026-08-06 实测）
+
+- `feat.sofa_timeseries` **仅 hour_index=0**（无 hourly 序列）→ 无法做时间序列 SOFA（需 Layer0 labevents 重算）
+- `staging.icustays.los_hours` **分布异常**（avg 3.6h，93% 患者 <24h）→ 不宜用于出院率拟合
+- 无真实呼吸机记录 → 呼吸机需求用 SOFA 推断
 
 ## 说明
 

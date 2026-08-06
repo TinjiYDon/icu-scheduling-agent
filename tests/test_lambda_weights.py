@@ -15,6 +15,7 @@ def test_lambda_defaults_include_all_objectives():
         "overload": 1.0,
         "balance": 0.1,
         "zone_mismatch": 0.5,
+        "move": 0.5,
     }
 
 
@@ -29,6 +30,7 @@ def test_lambda_override_does_not_mutate_other_weights():
         "overload": 1.0,
         "balance": 0.25,
         "zone_mismatch": 1.5,
+        "move": 0.5,
     }
 
 
@@ -52,6 +54,7 @@ def test_lambda_rejects_all_zero():
                 "overload": 0,
                 "balance": 0,
                 "zone_mismatch": 0,
+                "move": 0,
             },
         )
 

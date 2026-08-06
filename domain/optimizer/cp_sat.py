@@ -38,10 +38,18 @@ def _zone_label(zone_idx: int) -> str:
     return ["UNK", "MICU", "SICU", "CCU", "NICU"][zone_idx] if 0 <= zone_idx <= 4 else "UNK"
 
 
-def _needs_ventilator(stay_id: int) -> bool:
-    """Deterministic pseudo-random: ~35% of patients need ventilator."""
-    h = hashlib.md5(str(stay_id).encode()).hexdigest()
-    return int(h[:8], 16) % 100 < 35
+def _needs_ventilator(stay_id: int, sofa_total: float = 0.0) -> bool:
+    """Deterministic, data-driven: higher SOFA → more likely to need a ventilator.
+
+    Replaces the flat ~35% random guess with a SOFA-based probability curve:
+    SOFA>=10 → 90%, SOFA 6-9 → 55%, SOFA<6 → 20%.
+    """
+    h = int(hashlib.md5(str(stay_id).encode()).hexdigest()[:8], 16) % 100
+    if sofa_total >= 10:
+        return h < 90
+    if sofa_total >= 6:
+        return h < 55
+    return h < 20
 
 
 _LAMBDA_DEFAULTS = {
@@ -49,6 +57,7 @@ _LAMBDA_DEFAULTS = {
     "overload": 1.0,
     "balance": 0.1,
     "zone_mismatch": 0.5,
+    "move": 0.5,   # 挪床惩罚：已有患者换床的惩罚权重（临床稳定性）
 }
 
 
@@ -130,6 +139,7 @@ def run_assignment(
     persist: bool = True,
     split: str | None = None,
     stay_ids: list[int] | None = None,
+    occupied_beds: Mapping[int, int] | None = None,
 ) -> dict:
     """Run CP-SAT bed assignment.
 
@@ -140,6 +150,9 @@ def run_assignment(
         split: restrict candidates to "calib" (70% tuning) or "eval" (30%
             report-only) per eval_split config. None = all candidates.
         stay_ids: optional explicit candidate stay IDs for matched comparisons.
+        occupied_beds: optional mapping stay_id → current bed_id for patients
+            already admitted. Assigning such a patient to a different bed adds
+            a move penalty (f5) so re-optimization keeps patients stable.
     """
     if split is not None and split not in ("calib", "eval"):
         raise ValueError("split must be 'calib', 'eval' or None")
@@ -174,7 +187,10 @@ def run_assignment(
     n_beds = int(opt.get("resources", {}).get("n_beds", 20))
     n_iso_beds = min(int(opt.get("resources", {}).get("n_isolation_beds", 4)), n_beds)
     n_vents = int(opt.get("resources", {}).get("n_ventilators", 8))
-    max_patients = int(opt.get("resources", {}).get("max_patients", n_beds * 10))
+    max_patients = int(
+        opt.get("solver", {}).get("candidate_cap")
+        or opt.get("resources", {}).get("max_patients", n_beds * 10)
+    )
     bed_zones_cfg = opt.get("resources", {}).get(
         "bed_zones",
         [[1, 4, "ISO"], [5, 4, "MICU"], [9, 4, "SICU"], [13, 4, "CCU"], [17, 4, "NICU"]],
@@ -276,7 +292,7 @@ def run_assignment(
         weights[idx] = int(float(s["priority_weight"]) * 1000)
         cu = s.get("first_careunit")
         iso_flags[idx] = any(kw in (cu or "").lower() for kw in ("micu", "sicu", "cvicu", "nsicu"))
-        vent_flags[idx] = _needs_ventilator(s["stay_id"])
+        vent_flags[idx] = _needs_ventilator(s["stay_id"], float(s["sofa_total"]))
         patient_zones[idx] = _careunit_zone(cu)
 
     # ── 2. Build CP-SAT model ─────────────────────────────────────
@@ -368,12 +384,30 @@ def run_assignment(
     else:
         model.Add(zone_mismatch_penalty == 0)
 
+    # f₅: move penalty — penalize reassigning already-occupied patients to a
+    #     different bed (clinical stability: avoid unnecessary transfers)
+    move_penalty = model.NewIntVar(0, n_beds, "move_penalty")
+    occupied_beds = occupied_beds or {}
+    move_terms = []
+    for i, s in enumerate(stays):
+        current_bed = occupied_beds.get(s["stay_id"])
+        if current_bed is None:
+            continue
+        for b in range(n_beds):
+            if b + 1 != current_bed:
+                move_terms.append(x[i, b])
+    if move_terms:
+        model.Add(move_penalty == sum(move_terms))
+    else:
+        model.Add(move_penalty == 0)
+
     # Combined objective
     objective_bounds = {
         "wait": max(1, n_beds * max(weights, default=1)),
         "overload": max(1, n_beds * max(sofa_vals, default=1)),
         "balance": max(1, n_beds),
         "zone_mismatch": max(1, n_beds),
+        "move": max(1, n_beds),
     }
     objective_coefficients = {
         name: _objective_coefficient(lam[name], objective_bounds[name])
@@ -384,11 +418,14 @@ def run_assignment(
         - objective_coefficients["overload"] * overload_penalty
         - objective_coefficients["balance"] * max_dev
         - objective_coefficients["zone_mismatch"] * zone_mismatch_penalty
+        - objective_coefficients["move"] * move_penalty
     )
 
     # ── 4. Solve ──────────────────────────────────────────────────
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 30.0
+    solver.parameters.max_time_in_seconds = float(
+        opt.get("solver", {}).get("max_time_seconds", 30.0)
+    )
     status = solver.Solve(model)
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         raise RuntimeError(f"CP-SAT failed: status={status}")
@@ -476,6 +513,7 @@ def run_assignment(
             "f2_overload_penalty": f2_val,
             "f3_balance_deviation": balance_dev,
             "f4_zone_mismatch": zone_mismatch_val,
+            "f5_move_penalty": solver.Value(move_penalty),
             "zone_loads": zone_vals,
         },
         # These business metrics are independent of lambda coefficients, so

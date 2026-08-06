@@ -3,8 +3,9 @@ lambda:
   overload: 1.0
   balance: 0.1
   zone_mismatch: 0.5
+  move: 0.5   # 挪床惩罚：已有患者换床的惩罚权重（滚动重优化时保持稳定）
 resources:
-  n_beds: 20
+  n_beds: 30
   n_isolation_beds: 4
   n_ventilators: 8
   max_patients: 200

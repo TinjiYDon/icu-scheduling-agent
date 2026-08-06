@@ -31,6 +31,9 @@
 | 6 | 可解释输出 | `explain.py` CLI + 队友 v4 面板 plan["explain"] 接入 | 08-01 |
 | 7 | PPO 训练 | 完整 200K 步，`artifacts/ppo_icu.zip`，评估 PPO≈Greedy | 08-02 |
 | 8 | PPO 深入对比 | `application/evaluate_ppo_benchmark.py` 同候选规模多 episode 评估 | 08-04 |
+| 9 | 面板前端可解释 | KPI help / 三图各占一行+解释 / 坐标轴 / 表格列说明 | 08-05 |
+| 10 | 参数真实生效 | `n_beds` 可调、`candidate_cap`/`max_time` 生效、改参数自动重跑 | 08-05/06 |
+| 11 | 滚动每步 CP-SAT | `engine.py` 每步真重优化 + f5 挪床惩罚 + 呼吸机 SOFA 驱动 | 08-06 |
 
 ---
 

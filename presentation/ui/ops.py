@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 OPT_PATH = ROOT / "configs" / "optimizer.yaml"
 
 
-def _sidebar_controls() -> tuple[int, bool, str]:
+def _sidebar_controls() -> tuple[int, bool, str, tuple]:
     opt = load_yaml("optimizer.yaml")
     resources = dict(opt.get("resources") or {})
     solver = dict(opt.get("solver") or {})
@@ -63,7 +63,8 @@ def _sidebar_controls() -> tuple[int, bool, str]:
     st.sidebar.caption("ui v4 · `scripts\\run_console.ps1`")
     if policy == "ppo":
         st.sidebar.info("PPO 模式只做模型推理与分配展示，不显示滚动占用图。")
-    return int(n_steps), bool(auto_run), policy
+    signature = (int(n_beds), int(cand), int(tmax), int(n_steps), policy)
+    return int(n_steps), bool(auto_run), policy, signature
 
 
 def _pct(v: object) -> str:
@@ -78,32 +79,72 @@ def _pct(v: object) -> str:
 def _kpi_row(sim: dict, plan: dict) -> None:
     m = plan.get("metrics") or {}
     ev = sim.get("evaluation") or {}
-    items = [
-        ("求解状态", m.get("solver_status", sim.get("solver_status", "—"))),
-        ("床位数", m.get("n_beds", sim.get("n_beds", "—"))),
-        ("已分配", m.get("assigned", sim.get("assigned", "—"))),
-        ("最终占用", f"{sim.get('final_occupancy', '—')}/{sim.get('n_beds', '—')}"),
-        ("利用率%", sim.get("bed_utilization_pct", "—")),
-        ("候选数", m.get("n_stays", sim.get("n_stays", "—"))),
-    ]
-    cols = st.columns(len(items))
-    for col, (lbl, val) in zip(cols, items):
-        col.metric(lbl, val)
-
     hr = m.get("high_risk_assigned_rate", sim.get("high_risk_assigned_rate", ev.get("high_risk_assigned_rate")))
     zm = m.get("zone_match_rate", sim.get("zone_match_rate", ev.get("zone_match_rate")))
     obj = m.get("objective") or sim.get("objective") or {}
-    c2 = st.columns(4)
-    c2[0].metric("高危分配率", _pct(hr))
-    c2[1].metric("Zone 匹配率", _pct(zm))
-    c2[2].metric("f₄ zone mismatch", obj.get("f4_zone_mismatch", "—"))
-    c2[3].metric("求解秒数", m.get("solve_time_seconds", ev.get("solve_time_seconds", "—")))
+
+    # 行 1：求解 / 规模（每行 4 列，保证名称与数值完整显示）
+    r1 = st.columns(4)
+    r1[0].metric(
+        "求解状态", m.get("solver_status", sim.get("solver_status", "—")),
+        help="CP-SAT 求解器返回状态：OPTIMAL=找到最优解，FEASIBLE=可行解",
+    )
+    r1[1].metric(
+        "床位数", m.get("n_beds", sim.get("n_beds", "—")),
+        help="本次配置的 ICU 床位总数（含隔离床）",
+    )
+    r1[2].metric(
+        "已分配", m.get("assigned", sim.get("assigned", "—")),
+        help="被分配到床位的高危候选患者数",
+    )
+    r1[3].metric(
+        "候选数", m.get("n_stays", sim.get("n_stays", "—")),
+        help="进入求解器的候选患者数（candidate_cap 限制）",
+    )
+
+    # 行 2：占用 / 关键率
+    r2 = st.columns(4)
+    r2[0].metric(
+        "最终占用",
+        f"{sim.get('final_occupancy', '—')}/{sim.get('n_beds', '—')}",
+        help="仿真结束时在床患者数 / 总床位数",
+    )
+    r2[1].metric(
+        "利用率%", sim.get("bed_utilization_pct", "—"),
+        help="仿真期间床位平均使用率（在床数÷床位数）",
+    )
+    r2[2].metric(
+        "高危分配率", _pct(hr),
+        help="SOFA≥10 的危重患者中，成功分配到床位的比例（越高越好）",
+    )
+    r2[3].metric(
+        "Zone 匹配率", _pct(zm),
+        help="被分配患者中，分到与其科室匹配的区域（MICU/SICU/CCU/NICU）的比例",
+    )
+
+    # 行 3：错配 / 耗时
+    r3 = st.columns(2)
+    r3[0].metric(
+        "科室错配", obj.get("f4_zone_mismatch", "—"),
+        help="科室错配惩罚值：分到错误区域的患者数（越小越好）",
+    )
+    r3[1].metric(
+        "求解秒数", m.get("solve_time_seconds", ev.get("solve_time_seconds", "—")),
+        help="CP-SAT 求解耗时（秒），反映实时性",
+    )
 
 
 def _style_high_sofa(df: pd.DataFrame) -> pd.DataFrame:
     if "sofa_total" not in df.columns:
         return df
     return df.sort_values("sofa_total", ascending=False)
+
+
+def _chart_block(title: str, description: str, fig: object) -> None:
+    """Render one chart on its own row with a title + plain-language caption."""
+    st.markdown(f"**{title}**")
+    st.caption(description)
+    st.plotly_chart(fig, use_container_width=True)
 
 
 def _run_selected_policy(policy: str, n_steps: int) -> dict:
@@ -149,13 +190,22 @@ def render_ops() -> None:
     st.title("ICU 床位调度 · 运行台")
     st.caption("CP-SAT 分配 + PPO 推理 + 滚动占用 · Plotly 可视化 · 首次可自动运行")
 
-    n_steps, auto_enabled, policy = _sidebar_controls()
+    n_steps, auto_enabled, policy, sig = _sidebar_controls()
     if "last_sim_payload" not in st.session_state:
         st.session_state.last_sim_payload = None
     if "ops_auto_ran" not in st.session_state:
         st.session_state.ops_auto_ran = False
     if "last_run_policy" not in st.session_state:
         st.session_state.last_run_policy = None
+    if "ops_last_params" not in st.session_state:
+        st.session_state.ops_last_params = sig
+
+    # 参数变化（床位数/候选上限/求解秒数/滚动步数/策略）→ 清掉旧结果，自动重跑
+    if st.session_state.ops_last_params != sig:
+        st.session_state.last_sim_payload = None
+        st.session_state.ops_auto_ran = False
+        st.session_state.last_run_policy = None
+        st.session_state.ops_last_params = sig
 
     if st.session_state.last_run_policy and st.session_state.last_run_policy != policy:
         st.session_state.last_sim_payload = None
@@ -219,26 +269,64 @@ def render_ops() -> None:
             hist = sim.get("history") or []
             n_beds = int(sim.get("n_beds") or 20)
             if hist:
-                st.plotly_chart(fig_occupancy_timeline(hist), use_container_width=True)
-                c1, c2 = st.columns(2)
-                with c1:
-                    st.plotly_chart(
-                        fig_occupancy_heatmap(hist, n_beds),
-                        use_container_width=True,
-                    )
-                with c2:
-                    st.plotly_chart(fig_sofa_avg(hist), use_container_width=True)
+                _chart_block(
+                    "① 滚动占用与入出转",
+                    "折线（左轴）显示每个滚动步在床患者数；柱状（右轴）显示该步入院与出院人数。"
+                    "占用接近床位数说明资源紧张。",
+                    fig_occupancy_timeline(hist),
+                )
+                _chart_block(
+                    "② 床位利用率热力",
+                    "横轴为滚动步，颜色深浅表示该步的床位利用率（0~100%）。"
+                    "颜色越深代表越接近满负荷。",
+                    fig_occupancy_heatmap(hist, n_beds),
+                )
+                _chart_block(
+                    "③ 在床患者平均 SOFA",
+                    "横轴为滚动步，纵轴为在床患者平均 SOFA 分（0~24，越高病情越重）。"
+                    "平均分上升说明当前收治患者整体更危重。",
+                    fig_sofa_avg(hist),
+                )
                 with st.expander("滚动历史表"):
-                    st.dataframe(pd.DataFrame(hist), use_container_width=True, hide_index=True)
+                    hist_df = pd.DataFrame(hist).rename(
+                        columns={
+                            "step": "步",
+                            "occupied": "在床",
+                            "admitted": "入院",
+                            "discharged": "出院",
+                            "avg_weight": "平均优先级",
+                            "avg_sofa": "平均SOFA",
+                            "avg_stay_steps": "平均在院(步)",
+                        }
+                    )
+                    st.caption("每步（2 小时）的在床数、入院/出院人数、平均优先级、平均 SOFA、平均在院时长")
+                    st.dataframe(hist_df, use_container_width=True, hide_index=True)
             rows = plan.get("assignments") or []
             if rows:
-                st.subheader("床位分配结果（高 SOFA 优先列出）")
+                st.subheader("床位分配结果（高 SOFA 优先）")
                 df = _style_high_sofa(pd.DataFrame(rows))
+                df = df.rename(
+                    columns={
+                        "stay_id": "患者ID",
+                        "bed_id": "床号",
+                        "bed_type": "床区",
+                        "patient_zone": "患者科室",
+                        "zone_match": "匹配",
+                        "priority_weight": "优先级",
+                        "sofa_total": "SOFA",
+                    }
+                )
+                keep = ["患者ID", "床号", "床区", "患者科室", "匹配", "优先级", "SOFA"]
+                df = df[[c for c in keep if c in df.columns]]
                 st.dataframe(df, use_container_width=True, hide_index=True)
-                if "sofa_total" in df.columns:
-                    hi = df[df["sofa_total"].fillna(0) >= 10]
+                st.caption(
+                    "床区=ICU 区域（隔离/内科/外科/心脏/新生儿）· 匹配=是否分到对应科室区域(✓/✗) · "
+                    "优先级=越高越优先收治 · SOFA=危重程度(0~24 越高越重)"
+                )
+                if "SOFA" in df.columns:
+                    hi = df[df["SOFA"].fillna(0) >= 10]
                     if len(hi):
-                        st.caption(f"高危 SOFA≥10：{len(hi)} 人已分配（表已按 SOFA 降序）")
+                        st.caption(f"⚠️ 高危 SOFA≥10：{len(hi)} 人已分配（表已按 SOFA 降序）")
             with st.expander("仿真 JSON"):
                 st.json(sim)
     else:

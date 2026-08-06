@@ -23,7 +23,7 @@ def fig_occupancy_timeline(history: Sequence[dict[str, Any]]) -> go.Figure:
         go.Scatter(
             x=steps,
             y=occ,
-            name="occupied",
+            name="在床患者",
             mode="lines+markers",
             line=dict(color=TEAL, width=3),
             fill="tozeroy",
@@ -32,11 +32,11 @@ def fig_occupancy_timeline(history: Sequence[dict[str, Any]]) -> go.Figure:
         secondary_y=False,
     )
     fig.add_trace(
-        go.Bar(x=steps, y=adm, name="admitted", marker_color=BLUE, opacity=0.7),
+        go.Bar(x=steps, y=adm, name="入院", marker_color=BLUE, opacity=0.7),
         secondary_y=True,
     )
     fig.add_trace(
-        go.Bar(x=steps, y=dis, name="discharged", marker_color=CORAL, opacity=0.7),
+        go.Bar(x=steps, y=dis, name="出院", marker_color=CORAL, opacity=0.7),
         secondary_y=True,
     )
     fig.update_layout(
@@ -49,9 +49,9 @@ def fig_occupancy_timeline(history: Sequence[dict[str, Any]]) -> go.Figure:
         font=dict(color=SLATE),
         legend=dict(orientation="h", y=1.12),
     )
-    fig.update_xaxes(title_text="步", gridcolor="#e2e8f0")
-    fig.update_yaxes(title_text="在床数", secondary_y=False, gridcolor="#e2e8f0")
-    fig.update_yaxes(title_text="入院 / 出院", secondary_y=True)
+    fig.update_xaxes(title_text="滚动步（每步 2 小时）", gridcolor="#e2e8f0")
+    fig.update_yaxes(title_text="在床患者数", secondary_y=False, gridcolor="#e2e8f0")
+    fig.update_yaxes(title_text="入院 / 出院人数", secondary_y=True)
     return fig
 
 
@@ -65,12 +65,12 @@ def fig_occupancy_heatmap(history: Sequence[dict[str, Any]], n_beds: int) -> go.
         data=go.Heatmap(
             z=[rates],
             x=steps,
-            y=["利用率 %"],
+            y=["利用率"],
             colorscale=[[0, "#ecfdf5"], [0.5, "#5eead4"], [1, "#0f766e"]],
             zmin=0,
             zmax=100,
             hovertemplate="步=%{x}<br>利用率=%{z:.1f}%<extra></extra>",
-            colorbar=dict(title="%"),
+            colorbar=dict(title="利用率(%)"),
         )
     )
     fig.update_layout(
@@ -80,6 +80,8 @@ def fig_occupancy_heatmap(history: Sequence[dict[str, Any]], n_beds: int) -> go.
         paper_bgcolor="rgba(0,0,0,0)",
         font=dict(color=SLATE),
     )
+    fig.update_xaxes(title_text="滚动步（每步 2 小时）")
+    fig.update_yaxes(title_text="床位利用率 (%)")
     return fig
 
 
@@ -93,13 +95,13 @@ def fig_sofa_avg(history: Sequence[dict[str, Any]]) -> go.Figure:
             mode="lines+markers",
             line=dict(color=CORAL, width=2),
             marker=dict(size=8),
-            name="avg SOFA",
+            name="平均 SOFA",
         )
     )
     fig.update_layout(
         title="在床患者平均 SOFA",
-        xaxis_title="步",
-        yaxis_title="平均 SOFA",
+        xaxis_title="滚动步（每步 2 小时）",
+        yaxis_title="在床患者平均 SOFA（分）",
         height=280,
         margin=dict(l=40, r=20, t=48, b=40),
         paper_bgcolor="rgba(0,0,0,0)",
