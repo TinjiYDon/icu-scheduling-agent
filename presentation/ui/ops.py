@@ -154,6 +154,21 @@ def _run_selected_policy(policy: str, n_steps: int) -> dict:
     return {"policy": "cp_sat", **payload}
 
 
+def _normalize_payload(payload: dict) -> dict:
+    """Unpack legacy nested payloads (simulate containing plan) into flat structure."""
+    if not payload:
+        return payload
+    p = dict(payload)
+    # Legacy: {"simulate": {"simulate": ..., "plan": ...}} -> unpack
+    inner_sim = p.get("simulate")
+    if isinstance(inner_sim, dict) and "plan" in inner_sim and "simulate" in inner_sim:
+        p["simulate"] = inner_sim["simulate"]
+        p["plan"] = inner_sim["plan"]
+        if "assign" in inner_sim:
+            p["assign"] = inner_sim["assign"]
+    return p
+
+
 def _render_ppo_result(result: dict) -> None:
     ppo = result.get("ppo") or {}
     reward_components = ppo.get("reward_components") or {}
@@ -200,6 +215,15 @@ def render_ops() -> None:
     if "ops_last_params" not in st.session_state:
         st.session_state.ops_last_params = sig
 
+    # Clear legacy malformed payloads cached before the "**payload" fix (8b90e4e follow-up)
+    payload_check = st.session_state.last_sim_payload
+    if payload_check and "plan" not in payload_check:
+        inner = payload_check.get("simulate")
+        if isinstance(inner, dict) and "plan" not in inner:
+            st.session_state.last_sim_payload = None
+            st.session_state.ops_auto_ran = False
+            st.session_state.last_run_policy = None
+
     # 参数变化（床位数/候选上限/求解秒数/滚动步数/策略）→ 清掉旧结果，自动重跑
     if st.session_state.ops_last_params != sig:
         st.session_state.last_sim_payload = None
@@ -242,19 +266,22 @@ def render_ops() -> None:
                 f"已分配={ppo.get('assigned', '—')} · 总奖励={ppo.get('total_reward', '—')}"
             )
         else:
+            payload = _normalize_payload(payload)
+            plan = payload.get("plan") or {}
+            sim = payload.get("simulate") or {}
             st.success(
-                f"完成 · run_id={payload['plan'].get('run_id')} · "
-                f"求解={payload['simulate'].get('solver_status')} · "
-                f"mlflow={payload['simulate'].get('mlflow_run_id', '跳过')}"
+                f"完成 · run_id={plan.get('run_id', '—')} · "
+                f"求解={sim.get('solver_status', '—')} · "
+                f"mlflow={sim.get('mlflow_run_id', '跳过')}"
             )
 
-    payload = st.session_state.last_sim_payload
+    payload = _normalize_payload(st.session_state.last_sim_payload)
     if payload:
         if policy == "ppo":
             _render_ppo_result(payload)
         else:
-            sim = payload["simulate"]
-            plan = payload["plan"]
+            sim = payload.get("simulate") or {}
+            plan = payload.get("plan") or {}
             _kpi_row(sim, plan)
             explain = plan.get("explain")
             with st.sidebar:
