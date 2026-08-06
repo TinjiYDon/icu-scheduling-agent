@@ -1,0 +1,25 @@
+# icu-scheduling-agent Streamlit 控制台配置
+# 强制 Light Theme：从源头禁止 Streamlit 继承系统暗色模式导致 st.json / dataframe / code 暗底白字看不见
+[theme]
+base = "light"
+primaryColor = "#0f766e"
+backgroundColor = "#f8fafc"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#0f172a"
+
+[server]
+port = 8502
+headless = true
+enableCORS = false
+enableXsrfProtection = false
+maxUploadSize = 50
+fileWatcherType = "poll"
+
+[browser]
+gatherUsageStats = false
+serverAddress = "localhost"
+serverPort = 8502
+
+[client]
+showErrorDetails = true
+toolbarMode = "minimal"

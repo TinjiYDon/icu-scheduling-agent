@@ -1,4 +1,8 @@
-"""Plotly charts for scheduling ops console."""
+"""Plotly charts for scheduling ops console.
+
+统一使用 Plotly 内置 `plotly_white` 模板（依赖 Streamlit Light Theme），
+保证所有文字/轴/图例/悬停标签自动为深色，避免单独逐字段设 color 时漏覆盖。
+"""
 
 from __future__ import annotations
 
@@ -8,9 +12,31 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 TEAL = "#0f766e"
-SLATE = "#334155"
+SLATE = "#0f172a"
 CORAL = "#c2410c"
 BLUE = "#1d4ed8"
+
+
+def _apply_white_template(fig: go.Figure, title: str, height: int) -> None:
+    """统一应用 plotly_white 模板 + 标题 + 高 + 透明度 + 主色调。"""
+    fig.update_layout(
+        template="plotly_white",
+        title=title,
+        height=height,
+        margin=dict(l=40, r=40, t=48, b=40),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(248,250,252,0.9)",
+        font=dict(color=SLATE, family="Microsoft YaHei, PingFang SC, sans-serif"),
+        title_font=dict(color=SLATE),
+        legend=dict(font=dict(color=SLATE)),
+        hovermode="x unified",
+        hoverlabel=dict(
+            bgcolor="#ffffff",
+            font_size=12,
+            font_color=SLATE,
+            bordercolor="#cbd5e1",
+        ),
+    )
 
 
 def fig_occupancy_timeline(history: Sequence[dict[str, Any]]) -> go.Figure:
@@ -32,26 +58,18 @@ def fig_occupancy_timeline(history: Sequence[dict[str, Any]]) -> go.Figure:
         secondary_y=False,
     )
     fig.add_trace(
-        go.Bar(x=steps, y=adm, name="入院", marker_color=BLUE, opacity=0.7),
+        go.Bar(x=steps, y=adm, name="入院", marker_color=BLUE, opacity=0.75),
         secondary_y=True,
     )
     fig.add_trace(
-        go.Bar(x=steps, y=dis, name="出院", marker_color=CORAL, opacity=0.7),
+        go.Bar(x=steps, y=dis, name="出院", marker_color=CORAL, opacity=0.75),
         secondary_y=True,
     )
-    fig.update_layout(
-        title="滚动占用与入出转",
-        barmode="group",
-        height=360,
-        margin=dict(l=40, r=40, t=48, b=40),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(248,250,252,0.9)",
-        font=dict(color=SLATE),
-        legend=dict(orientation="h", y=1.12),
-    )
-    fig.update_xaxes(title_text="滚动步（每步 2 小时）", gridcolor="#e2e8f0")
-    fig.update_yaxes(title_text="在床患者数", secondary_y=False, gridcolor="#e2e8f0")
-    fig.update_yaxes(title_text="入院 / 出院人数", secondary_y=True)
+    fig.update_layout(barmode="group", legend=dict(orientation="h", y=1.12))
+    _apply_white_template(fig, "滚动占用与入出转", 360)
+    fig.update_xaxes(title_text="滚动步（每步 2 小时）", gridcolor="#e2e8f0", title_font=dict(color=SLATE), tickfont=dict(color=SLATE))
+    fig.update_yaxes(title_text="在床患者数", secondary_y=False, gridcolor="#e2e8f0", title_font=dict(color=SLATE), tickfont=dict(color=SLATE))
+    fig.update_yaxes(title_text="入院 / 出院人数", secondary_y=True, title_font=dict(color=SLATE), tickfont=dict(color=SLATE))
     return fig
 
 
@@ -70,18 +88,16 @@ def fig_occupancy_heatmap(history: Sequence[dict[str, Any]], n_beds: int) -> go.
             zmin=0,
             zmax=100,
             hovertemplate="步=%{x}<br>利用率=%{z:.1f}%<extra></extra>",
-            colorbar=dict(title="利用率(%)"),
+            colorbar=dict(
+                title="利用率(%)",
+                title_font=dict(color=SLATE),
+                tickfont=dict(color=SLATE),
+            ),
         )
     )
-    fig.update_layout(
-        title="床位利用率热力（按滚动步）",
-        height=180,
-        margin=dict(l=40, r=20, t=48, b=40),
-        paper_bgcolor="rgba(0,0,0,0)",
-        font=dict(color=SLATE),
-    )
-    fig.update_xaxes(title_text="滚动步（每步 2 小时）")
-    fig.update_yaxes(title_text="床位利用率 (%)")
+    _apply_white_template(fig, "床位利用率热力（按滚动步）", 180)
+    fig.update_xaxes(title_text="滚动步（每步 2 小时）", title_font=dict(color=SLATE), tickfont=dict(color=SLATE))
+    fig.update_yaxes(title_text="床位利用率 (%)", title_font=dict(color=SLATE), tickfont=dict(color=SLATE))
     return fig
 
 
@@ -98,16 +114,7 @@ def fig_sofa_avg(history: Sequence[dict[str, Any]]) -> go.Figure:
             name="平均 SOFA",
         )
     )
-    fig.update_layout(
-        title="在床患者平均 SOFA",
-        xaxis_title="滚动步（每步 2 小时）",
-        yaxis_title="在床患者平均 SOFA（分）",
-        height=280,
-        margin=dict(l=40, r=20, t=48, b=40),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(248,250,252,0.9)",
-        font=dict(color=SLATE),
-    )
-    fig.update_xaxes(gridcolor="#e2e8f0")
-    fig.update_yaxes(gridcolor="#e2e8f0")
+    _apply_white_template(fig, "在床患者平均 SOFA", 280)
+    fig.update_xaxes(title_text="滚动步（每步 2 小时）", gridcolor="#e2e8f0", title_font=dict(color=SLATE), tickfont=dict(color=SLATE))
+    fig.update_yaxes(title_text="在床患者平均 SOFA（分）", gridcolor="#e2e8f0", title_font=dict(color=SLATE), tickfont=dict(color=SLATE))
     return fig
