@@ -1,33 +1,44 @@
 lambda:
-  wait: 10.0
-  overload: 1.0
+  # Written back from 256-combo calib + eval verification (docs/LAMBDA_TUNING.md, 2026-08-02)
+  wait: 0.5
+  overload: 0.1
   balance: 0.1
-  # 原模型中科室不匹配每例固定惩罚 50；0.5 × 100 保持该默认强度。
-  zone_mismatch: 0.5
-
+  zone_mismatch: 0.1
+  occupancy: 2.0
 resources:
   n_beds: 20
   n_isolation_beds: 4
   n_ventilators: 8
-  max_patients: 200   # 候选患者上限 = n_beds × 10
-  # 床位分区: (起始号, 数量, 标签)
+  max_patients: 200
   bed_zones:
-    - [1, 4, "ISO"]
-    - [5, 4, "MICU"]
-    - [9, 4, "SICU"]
-    - [13, 4, "CCU"]
-    - [17, 4, "NICU"]
-
+  - - 1
+    - 4
+    - ISO
+  - - 5
+    - 4
+    - MICU
+  - - 9
+    - 4
+    - SICU
+  - - 13
+    - 4
+    - CCU
+  - - 17
+    - 4
+    - NICU
 rolling:
   step_hours: 2
-
+  # Default turnover; refresh via: python -m application.train_priority --intensity-only
+  admission_rate: 0.15
+  discharge_rate: 0.15
 eval_split:
-  calib_ratio: 0.7   # 70% calib 调参 / 30% eval 只评估（不回写调参）
+  calib_ratio: 0.7
   seed: 42
-
 policy:
-  default: cp_sat   # cp_sat | ppo | hybrid
-
+  default: cp_sat
+predict:
+  # In-repo GBDT → feat.patient_priority (no decision-agent coupling)
+  priority_source: gbdt  # gbdt | sofa_rule
 ppo:
   candidate_patients: 20
   training_pool_patients: 200
@@ -42,3 +53,7 @@ ppo:
   n_steps: 256
   total_timesteps: 200000
   model_path: artifacts/ppo_icu
+  inference_n_beds: 20
+solver:
+  candidate_cap: 1000
+  max_time_seconds: 180

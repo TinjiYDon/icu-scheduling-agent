@@ -17,8 +17,8 @@ def _deterministic_seed(step: int, base: int = 42) -> None:
 
 def run_rolling_simulation(
     n_steps: int = 12,        # steps (each = rolling_hours)
-    discharge_rate: float = 0.15,  # fraction of occupied beds discharged per step
-    admission_rate: float = 0.15,  # fraction of beds refilled per step
+    discharge_rate: float | None = None,
+    admission_rate: float | None = None,
 ) -> dict:
     """Simulate ICU scheduling over multiple time steps.
 
@@ -32,7 +32,12 @@ def run_rolling_simulation(
     """
     opt = load_yaml("optimizer.yaml")
     n_beds = int(opt.get("resources", {}).get("n_beds", 20))
-    step_hours = int(opt.get("rolling", {}).get("step_hours", 2))
+    rolling_cfg = opt.get("rolling", {}) or {}
+    step_hours = int(rolling_cfg.get("step_hours", 2))
+    if discharge_rate is None:
+        discharge_rate = float(rolling_cfg.get("discharge_rate", 0.15))
+    if admission_rate is None:
+        admission_rate = float(rolling_cfg.get("admission_rate", 0.15))
 
     engine = get_engine()
 

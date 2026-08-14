@@ -24,9 +24,9 @@ forbidden: hard couple to icu-decision-agent risk API
 
 | 优先级 | 项 | 说明 |
 |--------|----|------|
-| P0 | 预测 → 优化 | 仓内 GBDT 调 `priority_weight`；可选 Cox/AFT 或 GBDT 回归 LOS |
-| P1 | 到达强度 | 历史强度 + 泊松/负二项或小 GBDT |
-| P1 | λ 定稿写回 | 推荐候选写入配置并冻结评测 |
+| P0 | ~~预测 → 优化~~ | **代码完成**：`python -m application.train_priority` |
+| P0 | ~~λ 定稿写回~~ | **已写回** `optimizer.yaml`（0.5/0.1/0.1/0.1） |
+| P1 | 到达强度写回滚动 | `estimate_arrival_intensity` 已有；待跑库后改 `rolling.*` |
 | P2 | PPO | 轨迹规范齐备前不宣称 online |
 
 ## 纠正

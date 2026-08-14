@@ -1,17 +1,14 @@
 # Progress · icu-scheduling-agent
 
-> 更新：2026-08-14  
-> 人读：本仓进度与边界。  
-> AI：`couples_to_decision_risk=false`；无 MIMIC 轨迹则勿写 online PPO 已交付。
+> 更新：2026-08-14（执行推进）
 
 ## Agent 上下文
 
 ```text
 repo: icu-scheduling-agent
-product: rolling-horizon ICU bed allocation
-solver_default: cp_sat
-ppo: contrast_only
-predict_then_optimize: planned (in-repo features)
+policy_default: cp_sat
+lambda_written_back: wait0.5/overload0.1/balance0.1/zone0.1
+predict_priority: application.train_priority (in-repo GBDT)
 couples_to_decision_risk: false
 ```
 
@@ -19,26 +16,13 @@ couples_to_decision_risk: false
 
 | 里程碑 | 状态 | 证据 |
 |--------|------|------|
-| CP-SAT 滚动床位分配 | 完成 | 默认 `cp_sat` |
-| λ 调参 + calib/eval | 完成 | PR #3 · LAMBDA_TUNING |
-| MaskablePPO 研究路径 | 完成 | PR #3；非默认 |
-| Ops 演示台 v4 | 完成 | main |
-| 仓内预测 → CP-SAT | 规划 | GBDT/LOS/到达；不接 decision |
+| CP-SAT / Ops / PPO 对照 | 完成 | main |
+| λ 定稿写回 | **完成** | `configs/optimizer.yaml` |
+| 仓内 GBDT → priority | **代码完成** | `domain/scoring/predict_priority.py` · 需 DB 跑 `train_priority` |
+| 到达强度估计 | **代码完成** | `estimate_arrival_intensity`；rolling 可读 yaml 费率 |
 
-## Issue / PR
+## 下一冲刺（剩余）
 
-- Issues #1–#6：全部关闭。
-- Open PR：无。
-- 遗留：λ 推荐值待写回配置；无 MIMIC 轨迹 → **不宣称 online PPO**。
-
-## 边界（已定）
-
-| 项 | 决定 |
-|----|------|
-| 与 decision | **不接** 风险分 / 无运行时依赖 |
-| 病情输入 | 仓内 `priority_weight` / SOFA 等 |
-| 生产策略 | CP-SAT；PPO 仅对照 |
-
-## 下一冲刺
-
-见 [ROADMAP.md](ROADMAP.md)。
+1. 在 restore dump 的库上跑 `python -m application.train_priority`，把建议费率写回 `rolling.*`。  
+2. 用新 priority 跑 `simulate` / Ops 对比 SOFA 规则基线。  
+3. PPO 仍仅对照；无轨迹不宣称 online。

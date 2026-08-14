@@ -59,7 +59,7 @@ lambda:
 
 > 搜索空间：4 个 λ 各取 {0.1, 0.5, 1.0, 2.0} = 256 组 · 全部 OPTIMAL · Pareto 前沿 9 个解
 
-**最终推荐（Pareto 规则）**：
+**最终推荐（Pareto 规则）→ 已写回 `configs/optimizer.yaml`（2026-08-14）**：
 
 ```yaml
 lambda:
@@ -67,8 +67,8 @@ lambda:
   overload: 0.1
   balance: 0.1
   zone_mismatch: 0.1
+  occupancy: 2.0   # 床位占用软目标（布局修复后保留）
 ```
-→ 分配 10/140 · 优先级 21.6 · 科室匹配 0.80 · 求解 0.08s
 
 | 关键 trade-off | 结论 |
 |------|------|
@@ -77,7 +77,7 @@ lambda:
 | overload 太高少分床 | =1.0 时只分 4-9 床 |
 | 所有解隔离床全满 | high_risk_waiting=130 → 真正的杠杆是资源，不是 λ |
 
-> ⚠️ **未写回 `optimizer.yaml`**：推荐值需队友确认（6 场景验证）后在 eval 上复核。
+> ✅ **已写回 `configs/optimizer.yaml`（2026-08-14）**：wait/overload/balance/zone_mismatch 采用完整网格推荐；`occupancy` 保留。
 > 备注：与 quick 推荐（wait=2.0）不同，完整网格在 balance/zone 维度补齐后权衡出 wait=0.5。
 
 ## eval 验证（2026-08-02 · 推荐 λ · eval 30% 独立患者）
