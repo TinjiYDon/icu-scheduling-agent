@@ -26,6 +26,9 @@ $env:PYTHONPATH = (Get-Location)
 | [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) | **答辩演示口播** |
 | [docs/STATUS.md](docs/STATUS.md) | 当前进度 |
 | [docs/README.md](docs/README.md) | 文档索引 |
+| 工作区 [PROGRESS / CHANGELOG / ROADMAP](../docs/PROGRESS.md) | 跨仓结项汇总（本地 monorepo） |
+
+**边界**：默认 `cp_sat`；预测层用仓内病情参数，**不接** decision 风险分。
 
 ## 答辩演示
 
