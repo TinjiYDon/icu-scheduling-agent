@@ -135,9 +135,10 @@ def build_priority_from_gbdt(*, use_los_feature: bool = True) -> dict:
 
 
 def estimate_arrival_intensity() -> dict:
-    """Empirical admission/discharge-ish rates from staging LOS distribution.
+    """Empirical turnover rates from staging LOS.
 
-    Maps mean LOS to a soft refill rate for rolling simulation defaults.
+    MIMIC ``icustays.los`` (and our staging column often named los_hours) is in
+    **days**. Convert to hours before mapping to per-step refill fraction.
     """
     engine = get_engine()
     with engine.connect() as conn:
@@ -152,14 +153,25 @@ def estimate_arrival_intensity() -> dict:
                 """
             )
         ).mappings().one()
-    mean_los = float(row["mean_los"] or 72.0)
-    # Expected fraction of beds turning over per 2h step ≈ step / mean_los
+    mean_los_days = float(row["mean_los"] or 3.0)
+    median_los_days = float(row["median_los"] or mean_los_days)
+    # Heuristic: values << 24 ⇒ stored as days (MIMIC los)
+    unit = "days"
+    mean_los_hours = mean_los_days * 24.0
+    median_los_hours = median_los_days * 24.0
+    if mean_los_days > 48:  # already looks like hours
+        unit = "hours"
+        mean_los_hours = mean_los_days
+        median_los_hours = median_los_days
     step_hours = 2.0
-    rate = float(np.clip(step_hours / max(mean_los, 1.0), 0.05, 0.35))
+    rate = float(np.clip(step_hours / max(mean_los_hours, 1.0), 0.05, 0.35))
     return {
         "n_stays": int(row["n"] or 0),
-        "mean_los_hours": mean_los,
-        "median_los_hours": float(row["median_los"] or mean_los),
+        "los_unit_detected": unit,
+        "mean_los_days": round(mean_los_hours / 24.0, 4),
+        "median_los_days": round(median_los_hours / 24.0, 4),
+        "mean_los_hours": round(mean_los_hours, 4),
+        "median_los_hours": round(median_los_hours, 4),
         "suggested_admission_rate": round(rate, 4),
         "suggested_discharge_rate": round(rate, 4),
         "step_hours": step_hours,

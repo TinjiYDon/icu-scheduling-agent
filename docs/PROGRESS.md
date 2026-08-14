@@ -1,28 +1,17 @@
 # Progress · icu-scheduling-agent
 
-> 更新：2026-08-14（执行推进）
+> 更新：2026-08-14（数据侧继续）
 
-## Agent 上下文
+## 已跑通（本机 dump 库）
 
-```text
-repo: icu-scheduling-agent
-policy_default: cp_sat
-lambda_written_back: wait0.5/overload0.1/balance0.1/zone0.1
-predict_priority: application.train_priority (in-repo GBDT)
-couples_to_decision_risk: false
-```
+| 项 | 结果 |
+|----|------|
+| `train_priority` | ✅ sklearn_gbr · n=94458 · pred_mean≈2.13 → `feat.patient_priority` |
+| 到达强度 | ✅ 检测 LOS 为 **天**；建议费率 **0.05** / 2h step（已写 `rolling.*`） |
+| `simulate` | ✅ `simulate_ok` · 12 步满床占用 · avg_weight≈3.1 |
 
-## 里程碑
+## 下一刀
 
-| 里程碑 | 状态 | 证据 |
-|--------|------|------|
-| CP-SAT / Ops / PPO 对照 | 完成 | main |
-| λ 定稿写回 | **完成** | `configs/optimizer.yaml` |
-| 仓内 GBDT → priority | **代码完成** | `domain/scoring/predict_priority.py` · 需 DB 跑 `train_priority` |
-| 到达强度估计 | **代码完成** | `estimate_arrival_intensity`；rolling 可读 yaml 费率 |
-
-## 下一冲刺（剩余）
-
-1. 在 restore dump 的库上跑 `python -m application.train_priority`，把建议费率写回 `rolling.*`。  
-2. 用新 priority 跑 `simulate` / Ops 对比 SOFA 规则基线。  
-3. PPO 仍仅对照；无轨迹不宣称 online。
+1. Ops 台目视对比 SOFA 规则 vs GBDT priority（可选）  
+2. 导出新 dump（含更新后的 priority）供队友  
+3. PPO 仍对照

@@ -29,8 +29,8 @@ resources:
 rolling:
   step_hours: 2
   # Default turnover; refresh via: python -m application.train_priority --intensity-only
-  admission_rate: 0.15
-  discharge_rate: 0.15
+  admission_rate: 0.05
+  discharge_rate: 0.05
 eval_split:
   calib_ratio: 0.7
   seed: 42

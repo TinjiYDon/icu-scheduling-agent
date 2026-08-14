@@ -17,8 +17,8 @@ release: scheduling-ops-v4
 ## [Unreleased]
 
 - λ 推荐值写回 `configs/optimizer.yaml`（0.5 / 0.1 / 0.1 / 0.1）。
-- 仓内 GBDT 优先级：`python -m application.train_priority`（不接 decision）。
-- 到达强度估计助手 + rolling 费率可读配置。
+- 仓内 GBDT 优先级：`python -m application.train_priority`（已在本机 94458 stays 跑通）。
+- 到达强度：LOS 按 **天** 换算；`rolling` 费率写回 **0.05**；`simulate_ok`。
 
 ## 2026-07 / 08
 
