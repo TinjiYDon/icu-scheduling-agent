@@ -16,8 +16,9 @@ release: scheduling-ops-v4
 
 ## [Unreleased]
 
-- 预测–优化层（仓内 GBDT / LOS / 到达强度 → CP-SAT）规划中。
-- **不接** `icu-decision-agent` 风险分；紧迫度用仓内 SOFA / priority 等。
+- λ 推荐值写回 `configs/optimizer.yaml`（0.5 / 0.1 / 0.1 / 0.1）。
+- 仓内 GBDT 优先级：`python -m application.train_priority`（不接 decision）。
+- 到达强度估计助手 + rolling 费率可读配置。
 
 ## 2026-07 / 08
 
