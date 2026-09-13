@@ -25,6 +25,7 @@ $env:PYTHONPATH = (Get-Location)
 | [docs/TUNING_LOCAL.md](docs/TUNING_LOCAL.md) | Plotly Ops 台启动 |
 | [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) | **答辩演示口播** |
 | [docs/STATUS.md](docs/STATUS.md) | 当前进度与仿真 |
+| [docs/TEAM_DIRECTION.md](docs/TEAM_DIRECTION.md) | **组员方向同步（必读）** |
 | [docs/PROGRESS.md](docs/PROGRESS.md) | 里程碑完成度 |
 | [docs/CHANGELOG.md](docs/CHANGELOG.md) | 本仓变更 / Release |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 下一版本 |

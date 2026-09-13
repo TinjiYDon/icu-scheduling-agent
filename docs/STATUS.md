@@ -1,4 +1,4 @@
-﻿# 项目状态
+# 项目状态
 
 > 更新：2026-09-13 · **独立调度深挖** · 滚动多目标 CP-SAT 主叙事 · PPO 为对照轨  
 > **叙事**：仓内 SOFA/GBDT 紧迫度；**不**读取 decision 风险分；轨迹协议齐备前不宣称 online MIMIC-PPO
@@ -59,6 +59,6 @@
 - `candidate_cap` 只限制 CP-SAT 候选，**不**裁剪 labs/SOFA/feat
 - **dump 可支撑** CP-SAT/仿真；**不可**单独支撑 online PPO 轨迹
 - PR #3 已于 2026-07-30 合入 main；`policy.default` 仍为 `cp_sat`
-- B 分支 `feat/cp-sat-multi-obj`：λ 搜索（256 组合 + eval 验证）+ PPO 200K 训练已完成，待合入 main
-- GitHub（2026-08-02）：无 open PR；轨迹仍缺
-- 进度看板：`d:\project\_local-data\mimic\PROGRESS.md`
+- λ 搜索与推荐候选已写回；PPO 为对照轨（见 [`PPO_SMOKE.md`](PPO_SMOKE.md)）
+- GitHub（2026-09-13）：主线 PR #8 已合入；轨迹协议与对照表见 [`TEAM_DIRECTION.md`](TEAM_DIRECTION.md)
+- 进度看板：`d:\project\_local-data\mimic\PROGRESS.md`（本地）
