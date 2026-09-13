@@ -7,6 +7,7 @@ from pathlib import Path
 
 from domain.optimizer.cp_sat import run_assignment
 from domain.ops.flywheel_archive import archive_flywheel
+from domain.ops.policy_comparison import flatten_comparison
 from domain.rl.evaluation import evaluate_greedy
 from domain.rl.factory import build_icu_env
 from domain.rl.policy import load_model, predict_assignments
@@ -36,6 +37,7 @@ def evaluate_ppo(model_path: str | None = None) -> dict:
             "evaluation": cp_sat_result.get("evaluation", {}),
         },
     }
+    report["comparison_table"] = flatten_comparison(report)
     output = Path("reports/ppo_evaluation.json")
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
