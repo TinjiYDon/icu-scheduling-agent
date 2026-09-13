@@ -5,6 +5,7 @@ from __future__ import annotations
 import streamlit as st
 
 from presentation.ui.accept import render_accept
+from presentation.ui.methods import render_methods
 from presentation.ui.ops import render_ops
 from presentation.ui.overview import render_overview
 from presentation.ui.theme import apply_theme
@@ -19,7 +20,8 @@ apply_theme()
 
 overview_page = st.Page(render_overview, title="项目", icon=":material/home:")
 ops_page = st.Page(render_ops, title="运行", icon=":material/bed:", default=True)
+methods_page = st.Page(render_methods, title="方法", icon=":material/science:")
 accept_page = st.Page(render_accept, title="验收", icon=":material/verified:")
 
-nav = st.navigation([overview_page, ops_page, accept_page])
+nav = st.navigation([overview_page, ops_page, methods_page, accept_page])
 nav.run()

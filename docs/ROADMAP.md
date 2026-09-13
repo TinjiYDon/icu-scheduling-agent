@@ -1,38 +1,43 @@
 # Roadmap · icu-scheduling-agent
 
-> 更新：2026-08-14  
-> 人读：下一版本 = 预测进目标、CP-SAT 仍做分配。  
-> AI：禁止实现「读取 decision 风险分」除非本文件改写且用户确认。
+> 更新：2026-09-13  
+> 人读：本仓独立出成果——多目标多约束滚动调度 + 深化 RL；不接 decision 风险分。  
+> AI：禁止实现「读取 decision 风险分」；轨迹协议齐备前勿宣称 online MIMIC-PPO。
 
 ## Agent 上下文
 
 ```text
 repo: icu-scheduling-agent
-vnext_p0: in-repo GBDT priority_weight; optional LOS
-vnext_p1: arrival intensity; lambda write-back
-vnext_p2: PPO only with trajectory protocol
-forbidden: hard couple to icu-decision-agent risk API
+vnext_p0: S-LIT SOTA_SURVEY; constraint honesty
+vnext_p1: rolling intensity; DATA_FLYWHEEL archive
+vnext_p2: trajectory protocol; multi-obj RL vs CP-SAT
+forbidden: hard couple to icu-decision-agent risk API; claim SOTA without LIT
+independent: zero hard couple; own dump/acceptance/release
 ```
 
 ## 原则
 
-1. 生产默认 CP-SAT；硬约束可审计。
-2. 预测层输出标量（优先级 / LOS / 到达）喂给优化器。
-3. 与 decision 仓零硬耦合。
+1. **独立项目**：床位/资源运筹为本仓唯一主叙事；紧迫度来自仓内 SOFA/GBDT。
+2. **先对标、再创新**：见 [SOTA_SURVEY.md](SOTA_SURVEY.md)；无 LIT 不宣称首创/SOTA。
+3. 生产默认 CP-SAT；硬约束可审计。
+4. 预测层输出标量（优先级 / LOS / 到达）喂给优化器。
+5. RL 在现有 MaskablePPO 框架上深化；与 CP-SAT 同场景对照。
 
-## vNext
+## vNext（Wave）
 
-| 优先级 | 项 | 说明 |
-|--------|----|------|
-| P0 | ~~预测 → 优化~~ | **代码完成**：`python -m application.train_priority` |
-| P0 | ~~λ 定稿写回~~ | **已写回** `optimizer.yaml`（0.5/0.1/0.1/0.1） |
-| P1 | 到达强度写回滚动 | `estimate_arrival_intensity` 已有；待跑库后改 `rolling.*` |
-| P2 | PPO | 轨迹规范齐备前不宣称 online |
-
+| 波次 | 项 | 说明 |
+|------|----|------|
+| **S-LIT** | 文献/市面对标 | [SOTA_SURVEY.md](SOTA_SURVEY.md) · 假设 H1–H3 |
+| S0 | 文档诚实化 | ISO/vent 求解边界；λ 与 `optimizer.yaml` 一致 |
+| S1 | 多目标多约束加深 | 可配置规则 + 违反报告；滚动到达强度写回 |
+| S2 | 轨迹协议 | rolling 导出 → `artifacts/trajectories/` |
+| S3 | 多目标约束 RL | `rl.reward_weights`；三方对照验收 |
+| **S-FLY** | 数据飞轮 | [DATA_FLYWHEEL.md](DATA_FLYWHEEL.md) · `reports/flywheel/` |
 ## 纠正
 
-旧文档「预警风险 → 优先级」**本版本不做**。紧迫度来自仓内病情参数 + 本仓预测。见 [TOP_TIER_NEXT.md](TOP_TIER_NEXT.md)。
+旧文档「预警风险 → 优先级」**不做**。见 [TOP_TIER_NEXT.md](TOP_TIER_NEXT.md)。
 
 ## 相关
 
-- [CHANGELOG.md](CHANGELOG.md) · [PROGRESS.md](PROGRESS.md) · [STATUS.md](STATUS.md)
+- [CHANGELOG.md](CHANGELOG.md) · [PROGRESS.md](PROGRESS.md) · [STATUS.md](STATUS.md) · [PARAM_STORY.md](PARAM_STORY.md)
+- [SOTA_SURVEY.md](SOTA_SURVEY.md) · [DATA_FLYWHEEL.md](DATA_FLYWHEEL.md) · [TRAJECTORY_PROTOCOL.md](TRAJECTORY_PROTOCOL.md)

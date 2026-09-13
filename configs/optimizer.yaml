@@ -39,6 +39,14 @@ policy:
 predict:
   # In-repo GBDT → feat.patient_priority (no decision-agent coupling)
   priority_source: gbdt  # gbdt | sofa_rule
+# Decoupled from lambda.* so CP-SAT tuning does not silently retune RL
+rl:
+  reward_weights:
+    wait: 0.5
+    overload: 0.1
+    balance: 0.1
+    zone_mismatch: 0.1
+    occupancy: 2.0
 ppo:
   candidate_patients: 20
   training_pool_patients: 200

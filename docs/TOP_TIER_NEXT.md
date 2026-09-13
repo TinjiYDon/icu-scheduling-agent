@@ -1,66 +1,27 @@
-# ICU 两仓 · 顶尖视角下一步（优化与功能调整）
+# 本仓顶尖视角下一步（scheduling）
 
-> 2026-08-02 · 在 S2 dump + 交互台之后的优先级建议  
-> 对标：临床决策支持（CDSS）、重症预测文献最佳实践、医院运筹/床位管理（OR/ICU capacity）
+> 2026-09-13 · **独立项目** · 多目标多约束滚动调度 + RL 深化  
+> 不接 decision 风险分。
 
 ## 总原则
 
-1. **决策价值 > 排行榜 AUC**：主报 PR-AUC、Brier、校准、决策曲线/净受益；ROC 仅对照。  
-2. **时间因果硬约束**：一切特征 `charttime < t`；标签窗口 `[t, t+H]` 与临床动作对齐。  
-3. **人机闭环可审计**：分数 → 档位 → 建议动作 → 可解释因子；可复现 dump + seed。  
-4. **两仓可独立交付**：调度紧迫度默认来自仓内 SOFA/priority + 预测层；**本版本不接 decision 风险分**（远期可选开关，见工作区 `docs/ROADMAP.md`）。
+1. 生产默认 CP-SAT；硬约束可审计。
+2. 紧迫度来自仓内 SOFA / GBDT priority。
+3. RL 须有轨迹协议；未齐备不宣称 online MIMIC-PPO。
+4. 与 decision **零硬耦合**。
 
----
+## vNext 对齐 ROADMAP Wave S0–S3
 
-## decision（实时恶化预警）
+| 优先级 | 项 | 建议落地 |
+|--------|----|----------|
+| P0 | 约束诚实化 | `PARAM_STORY` + `constraint_rules.yaml` |
+| P0 | 到达强度写回 | `train_priority --intensity-only` → `rolling.*` |
+| P1 | 违反可解释 | explain 披露 ISO/vent 规则来源 |
+| P1 | 轨迹协议 | rolling 导出 `artifacts/trajectories/` |
+| P2 | 多目标约束 RL | `rl.reward_weights`；CP-SAT/Greedy/PPO 对照 |
 
-| 优先级 | 项 | 为何顶尖做法需要 | 建议落地 |
-|--------|----|------------------|----------|
-| P0 | **死亡时间精度** | 日期级 `dod` 污染 12h 标签，削弱校准与工作点 | Layer0 `deathtime`；重算 label + 新 dump 版本号 |
-| P0 | **工作点与决策曲线** | 顶尖 CDSS 报「在何种代价下值得报警」 | 验收台扩展置信区间 + net benefit；固定临床阈值协议 |
-| P1 | **外部/时间漂移验证** | 单次 MIMIC split 不够发表/上线 | 按入院年 hold-out；报告性能衰减曲线 |
-| P1 | **在线分数监控** | 部署后特征缺失与 prevalence 漂移会毁校准 | 缺失率、分数分布、阳性率看板；与 MLflow 联动 |
-| P1 | **多任务/竞争风险** | 单纯死亡忽略转出/插管等竞争事件 | 次标签：24h 插管、升压、转出；共享特征头 |
-| P2 | **时序骨干（GRU-D/TFT）** | 表格 LightGBM 难吃不规则采样 | 仅在标签与 dump 版本稳定后上；与 LGBM 同 split 对照 |
-| P2 | **人机界面深化** | SHAP 表不够临床 | 趋势火花线、禁忌症提示、与医嘱系统只读对接（远期） |
+## 非目标
 
-**功能调整建议（近期）**
-
-- Streamlit 验收门禁保持「dump 行数 + 主指标」双闸；禁止只晒 ROC。  
-- MCP `predict_risk` 增加 `hour_index`，与 S2 对齐。  
-- 旧 Wave2 dump 仅作对照实验，文档已降级。
-
----
-
-## scheduling（滚动床位分配）
-
-| 优先级 | 项 | 为何顶尖做法需要 | 建议落地 |
-|--------|----|------------------|----------|
-| P0 | **仓内预测→优先级** | 临床紧迫度可学习，但不强绑 decision 仓 | GBDT/规则调 `priority_weight`（SOFA 等仓内特征）；**不接** decision 风险 |
-| P0 | **滚动重优化可解释** | 仅最终占用不够答辩/验收 | 每步：入出转原因、未分配队列、目标分解（已有 explain 可接 UI） |
-| P1 | **不确定性 SOFA / 鲁棒优化** | 化验延迟导致 SOFA 乐观 | 区间 SOFA 或缺失惩罚；候选 cap 与公平约束联合调 |
-| P1 | **公平与隔离约束叙事** | ISO/通气床是真实瓶颈 | 报告 zone mismatch、高危未分配率；Pareto 扫 lambda |
-| P1 | **与外部到达过程校准** | 固定 admission_rate 偏演示 | 用 MIMIC 入出科强度拟合滚动参数 |
-| P2 | **PPO / 学习型策略** | 仅当有可复现轨迹与离线评估协议 | 先做轨迹导出规范；禁止宣称 online 已训 |
-| P2 | **多 ICU / 院级转运** | 单单元调度上限明显 | 网络流/分层 CP-SAT（中长期） |
-
-**功能调整建议（近期）**
-
-- 交互台已并跑 CP-SAT + rolling history；验收以 solver∈{OPTIMAL,FEASIBLE} + 利用率为主。  
-- `candidate_cap` 继续只限求解、不裁数据。  
-- dump 刷新周期与 decision S2 解耦，但文档交叉引用。
-
----
-
-## 跨仓产品叙事（答辩/论文）
-
-1. **同一患者时间轴**：h=0..6 风险曲线 → 调度优先级抬升 → 床位/隔离分配。  
-2. **同一复现包**：Layer1 dump + seed + 指标 JSON + Streamlit 验收截图。  
-3. **明确非目标**：不把 demo PPO smoke 写成临床 RL；不把日期级死亡标签写成精确 12h 结局。
-
-## 建议下一迭代顺序
-
-1. decision `deathtime` 标签审计 → 重 dump → 验收台回归  
-2. scheduling **仓内**预测调 priority / LOS（**不接** decision）  
-3. 决策曲线 + 漂移监控  
-4. 时序模型 / PPO 轨迹（并行研究轨，不挡主交付）
+- `priority_weight ← decision risk_score`
+- dump/artifacts 入 Git
+- 无轨迹即宣称 online PPO 成功

@@ -1,0 +1,14 @@
+# Constraint demand marking (honest demo defaults — not clinical gold standard)
+isolation:
+  mode: careunit_keywords  # careunit_keywords | none
+  keywords:
+    - micu
+    - sicu
+    - cvicu
+    - nsicu
+ventilator:
+  mode: stay_hash_pct  # stay_hash_pct | none
+  hash_pct: 35  # ~35% of stays marked as needing a ventilator (deterministic)
+disclosure: >
+  Isolation/ventilator demands are configurable heuristics for solver demos.
+  They are NOT derived from real device orders or infection flags in MIMIC.
