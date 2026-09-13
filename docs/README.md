@@ -7,6 +7,7 @@
 | [PROJECT_GUIDE.md](PROJECT_GUIDE.md) | 架构与命令 |
 | [DATA_LOCAL.md](DATA_LOCAL.md) | dump / MIMIC |
 | [STATUS.md](STATUS.md) | 进度与仿真 |
+| [TEAM_DIRECTION.md](TEAM_DIRECTION.md) | 组员方向同步 |
 | [PROGRESS.md](PROGRESS.md) | 里程碑完成度（人/AI） |
 | [CHANGELOG.md](CHANGELOG.md) | 本仓变更与 Release |
 | [ROADMAP.md](ROADMAP.md) | 下一版本目标 |
