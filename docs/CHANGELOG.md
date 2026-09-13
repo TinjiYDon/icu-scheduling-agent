@@ -16,9 +16,13 @@ release: scheduling-ops-v4
 
 ## [Unreleased]
 
+- 独立深挖叙事：`ROADMAP` Wave S0–S3；零硬耦合 decision。
+- **S-LIT / S-FLY**：[`SOTA_SURVEY.md`](SOTA_SURVEY.md)、[`DATA_FLYWHEEL.md`](DATA_FLYWHEEL.md)；`simulate`/`evaluate_ppo` 归档 `reports/flywheel/`。
+- S0–S1：`configs/constraint_rules.yaml` + explain 披露；`write_rolling_rates` / `train_priority --write-rolling`。
+- S2：`docs/TRAJECTORY_PROTOCOL.md` + `application.export_trajectory` → `artifacts/trajectories/`。
+- S3：`rl.reward_weights`（含 occupancy）与 CP-SAT λ 解耦；默认仍 `cp_sat`。
 - λ 推荐值写回 `configs/optimizer.yaml`（0.5 / 0.1 / 0.1 / 0.1）。
-- 仓内 GBDT 优先级：`python -m application.train_priority`（已在本机 94458 stays 跑通）。
-- 到达强度：LOS 按 **天** 换算；`rolling` 费率写回 **0.05**；`simulate_ok`。
+- 仓内 GBDT 优先级：`python -m application.train_priority`。
 
 ## 2026-07 / 08
 

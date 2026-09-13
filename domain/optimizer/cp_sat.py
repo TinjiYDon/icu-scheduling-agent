@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import uuid
-import hashlib
 import math
 from typing import Mapping
 
@@ -16,6 +15,12 @@ from sqlalchemy import text
 from infra.config import load_yaml
 from infra.db import get_engine
 from domain.optimizer.eval_split import split_stay_ids
+from domain.optimizer.resources import layout_covers_beds, scale_bed_layout
+from domain.optimizer.constraint_rules import (
+    constraint_disclosure,
+    needs_isolation,
+    needs_ventilator,
+)
 
 
 def _careunit_zone(careunit: str | None) -> int:
@@ -39,9 +44,8 @@ def _zone_label(zone_idx: int) -> str:
 
 
 def _needs_ventilator(stay_id: int) -> bool:
-    """Deterministic pseudo-random: ~35% of patients need ventilator."""
-    h = hashlib.md5(str(stay_id).encode()).hexdigest()
-    return int(h[:8], 16) % 100 < 35
+    """Backward-compatible wrapper → configs/constraint_rules.yaml."""
+    return needs_ventilator(int(stay_id))
 
 
 _LAMBDA_DEFAULTS = {
@@ -49,6 +53,7 @@ _LAMBDA_DEFAULTS = {
     "overload": 1.0,
     "balance": 0.1,
     "zone_mismatch": 0.5,
+    "occupancy": 2.0,  # encourage filling free beds when hard-feasible
 }
 
 
@@ -115,23 +120,27 @@ def run_assignment(
         raise ValueError("split must be 'calib', 'eval' or None")
     opt = load_yaml("optimizer.yaml")
     lam = _resolve_lambda_weights(opt.get("lambda", {}), lambda_weights)
-    n_beds = int(opt.get("resources", {}).get("n_beds", 20))
-    n_iso_beds = int(opt.get("resources", {}).get("n_isolation_beds", 4))
-    n_vents = int(opt.get("resources", {}).get("n_ventilators", 8))
-    max_patients = int(opt.get("resources", {}).get("max_patients", n_beds * 10))
-    bed_zones_cfg = opt.get("resources", {}).get(
-        "bed_zones",
-        [[1, 4, "ISO"], [5, 4, "MICU"], [9, 4, "SICU"], [13, 4, "CCU"], [17, 4, "NICU"]],
-    )
+    resources = dict(opt.get("resources") or {})
+    n_beds = int(resources.get("n_beds", 20))
+    bed_zones_cfg = resources.get("bed_zones") or []
+    # Auto-heal stale 20-bed zone maps when n_beds was changed in the UI.
+    if not layout_covers_beds(bed_zones_cfg, n_beds):
+        scaled = scale_bed_layout(n_beds)
+        resources.update(scaled)
+        bed_zones_cfg = scaled["bed_zones"]
+    n_iso_beds = int(resources.get("n_isolation_beds", max(1, n_beds // 5)))
+    n_vents = int(resources.get("n_ventilators", max(1, round(n_beds * 8 / 20))))
+    max_patients = int(resources.get("max_patients", n_beds * 10))
+    n_iso_beds = min(n_iso_beds, n_beds)
     # Build bed_id → zone_label lookup (bed_id is 1-indexed)
     bed_zone_label: dict[int, str] = {}
     bed_zone_start: dict[str, int] = {}
     bed_zone_count: dict[str, int] = {}
     for start, count, label in bed_zones_cfg:
-        for b in range(start, start + count):
-            bed_zone_label[b] = label
-        bed_zone_start[label] = start
-        bed_zone_count[label] = count
+        for b in range(int(start), int(start) + int(count)):
+            bed_zone_label[b] = str(label)
+        bed_zone_start[str(label)] = int(start)
+        bed_zone_count[str(label)] = int(count)
     run_id = run_id or f"p0_{uuid.uuid4().hex[:8]}"
 
     # ── 1. Load patients ──────────────────────────────────────────
@@ -206,8 +215,8 @@ def run_assignment(
     for idx, s in enumerate(stays):
         weights[idx] = int(float(s["priority_weight"]) * 1000)
         cu = s.get("first_careunit")
-        iso_flags[idx] = any(kw in (cu or "").lower() for kw in ("micu", "sicu", "cvicu", "nsicu"))
-        vent_flags[idx] = _needs_ventilator(s["stay_id"])
+        iso_flags[idx] = needs_isolation(cu)
+        vent_flags[idx] = needs_ventilator(s["stay_id"])
         patient_zones[idx] = _careunit_zone(cu)
 
     # ── 2. Build CP-SAT model ─────────────────────────────────────
@@ -224,14 +233,12 @@ def run_assignment(
     for i in range(n):
         model.Add(sum(x[i, b] for b in range(n_beds)) <= 1)
 
-    # Isolation: isolation patients can only use isolation beds (first n_iso_beds)
-    #            non-isolation patients cannot use isolation beds
+    # Isolation patients must use isolation beds (first n_iso_beds).
+    # Non-isolation patients may use any bed (including free isolation beds),
+    # otherwise empty ISO capacity cannot be filled when n_beds grows.
     for i in range(n):
         if iso_flags[i]:
             for b in range(n_iso_beds, n_beds):
-                model.Add(x[i, b] == 0)
-        else:
-            for b in range(n_iso_beds):
                 model.Add(x[i, b] == 0)
 
     # Ventilator limit
@@ -243,6 +250,9 @@ def run_assignment(
         model.Add(sum(vent_assigned) <= n_vents)
 
     # ── 3. Multi-objective ────────────────────────────────────────
+    # f₀: occupancy — fill free beds when hard constraints allow
+    occupancy = sum(x[i, b] for i in range(n) for b in range(n_beds))
+
     # f₁: maximize priority_weight (minimize wait for high-risk patients)
     f1 = sum(weights[i] * x[i, b] for i in range(n) for b in range(n_beds))
 
@@ -258,7 +268,8 @@ def run_assignment(
     for z in range(4):
         start = z * zone_size
         end = start + zone_size if z < 3 else n_beds
-        zl = model.NewIntVar(0, zone_size, f"zone_load_{z}")
+        span = max(1, end - start)
+        zl = model.NewIntVar(0, span, f"zone_load_{z}")
         model.Add(zl == sum(x[i, b] for i in range(n) for b in range(start, end)))
         zone_load_vars.append(zl)
 
@@ -301,6 +312,7 @@ def run_assignment(
 
     # Combined objective
     objective_bounds = {
+        "occupancy": max(1, n_beds),
         "wait": max(1, n_beds * max(weights, default=1)),
         "overload": max(1, n_beds * max(sofa_vals, default=1)),
         "balance": max(1, n_beds),
@@ -311,7 +323,8 @@ def run_assignment(
         for name in lam
     }
     model.Maximize(
-        objective_coefficients["wait"] * f1
+        objective_coefficients["occupancy"] * occupancy
+        + objective_coefficients["wait"] * f1
         - objective_coefficients["overload"] * overload_penalty
         - objective_coefficients["balance"] * max_dev
         - objective_coefficients["zone_mismatch"] * zone_mismatch_penalty
@@ -403,6 +416,7 @@ def run_assignment(
             "coefficients": objective_coefficients,
         },
         "objective": {
+            "f0_occupancy": assigned_count,
             "f1_priority_total": f1_val,
             "f2_overload_penalty": f2_val,
             "f3_balance_deviation": balance_dev,
@@ -443,6 +457,11 @@ def run_assignment(
             "isolation_beds_used": f"{n_iso_used}/{n_iso_beds}",
             "ventilators_used": f"{n_vent_used}/{n_vents}",
             "zone_matches": f"{n_zone_match}/{len(assignments)}",
+        },
+        "constraint_rules": constraint_disclosure(),
+        "constraint_demand": {
+            "n_isolation_demand": int(sum(1 for f in iso_flags if f)),
+            "n_ventilator_demand": int(sum(1 for f in vent_flags if f)),
         },
         "top_assignments": assignments,
     }

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
-from domain.optimizer.cp_sat import _careunit_zone, _needs_ventilator, _zone_label
+from domain.optimizer.constraint_rules import needs_isolation, needs_ventilator
+from domain.optimizer.cp_sat import _careunit_zone, _zone_label
 from domain.rl.env import Bed, Patient
 from infra.config import load_yaml
 from infra.db import get_engine
@@ -36,24 +37,21 @@ def load_patients(limit: int | None = None) -> list[Patient]:
 
 def patient_from_row(row: dict) -> Patient:
     careunit = row.get("first_careunit") or ""
-    lower_careunit = careunit.lower()
     return Patient(
         stay_id=int(row["stay_id"]),
         priority_weight=float(row.get("priority_weight", 1.0)),
         sofa_total=float(row.get("sofa_total", 0.0)),
         preferred_zone=_zone_label(_careunit_zone(careunit)),
-        needs_isolation=any(
-            keyword in lower_careunit for keyword in ("micu", "sicu", "cvicu", "nsicu")
-        ),
-        needs_ventilator=_needs_ventilator(int(row["stay_id"])),
+        needs_isolation=needs_isolation(careunit),
+        needs_ventilator=needs_ventilator(int(row["stay_id"])),
     )
 
 
-def load_beds() -> list[Bed]:
+def load_beds(n_beds: int | None = None) -> list[Bed]:
     config = load_yaml("optimizer.yaml")
     resources = config.get("resources", {})
-    n_beds = int(resources.get("n_beds", 20))
-    zones = resources.get("bed_zones", [[1, n_beds, "REG"]])
+    n = int(n_beds if n_beds is not None else resources.get("n_beds", 20))
+    zones = resources.get("bed_zones", [[1, n, "REG"]])
     zone_by_id = {
         bed_id: str(label)
         for start, count, label in zones
@@ -68,5 +66,5 @@ def load_beds() -> list[Bed]:
             # bed is compatible; ICUEnv separately enforces global capacity.
             has_ventilator=True,
         )
-        for bed_id in range(1, n_beds + 1)
+        for bed_id in range(1, n + 1)
     ]

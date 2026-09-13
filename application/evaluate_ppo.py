@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from domain.optimizer.cp_sat import run_assignment
+from domain.ops.flywheel_archive import archive_flywheel
 from domain.rl.evaluation import evaluate_greedy
 from domain.rl.factory import build_icu_env
 from domain.rl.policy import load_model, predict_assignments
@@ -38,6 +39,10 @@ def evaluate_ppo(model_path: str | None = None) -> dict:
     output = Path("reports/ppo_evaluation.json")
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        report["flywheel_archive"] = archive_flywheel("ppo_eval", report)
+    except OSError as exc:
+        report["flywheel_archive_error"] = str(exc)
     return report
 
 

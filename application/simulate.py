@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+
+from domain.ops.flywheel_archive import archive_flywheel
 from domain.rolling.engine import run_rolling_simulation
 
 
@@ -14,6 +16,10 @@ def run_simulate(n_steps: int = 12) -> dict:
     """
     result = run_rolling_simulation(n_steps=n_steps)
     result["status"] = "simulate_ok"
+    try:
+        result["flywheel_archive"] = archive_flywheel("simulate", result)
+    except OSError as exc:
+        result["flywheel_archive_error"] = str(exc)
     return result
 
 

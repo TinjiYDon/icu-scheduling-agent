@@ -25,6 +25,19 @@ def explain_assignment(result: dict) -> str:
         f"  分配/候选     : {result['assigned']}/{result.get('n_stays','?')}"
         f"  (床位: {result['n_beds']})"
     )
+    rules = result.get("constraint_rules") or {}
+    if rules:
+        lines.append("  约束需求规则  : "
+                     f"iso={rules.get('isolation_mode')} · vent={rules.get('ventilator_mode')}"
+                     f"（pct={rules.get('ventilator_hash_pct')}）")
+        if rules.get("disclosure"):
+            lines.append(f"  规则披露      : {str(rules['disclosure']).strip()[:120]}")
+    demand = result.get("constraint_demand") or {}
+    if demand:
+        lines.append(
+            f"  需求标记计数  : iso={demand.get('n_isolation_demand')} · "
+            f"vent={demand.get('n_ventilator_demand')}"
+        )
     lines.append("")
 
     # ── 1. Objective decomposition ──

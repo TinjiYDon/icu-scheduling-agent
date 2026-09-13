@@ -1,6 +1,7 @@
 ﻿# 项目状态
 
-> 更新：2026-08-02 · **滚动时域实时调度**主叙事 · 演示台 v4（总览 + Ops 自动跑/可解释/KPI）· B 完成 calib/eval split + 业务指标 + λ 搜索 + PPO 训练
+> 更新：2026-09-13 · **独立调度深挖** · 滚动多目标 CP-SAT 主叙事 · PPO 为对照轨  
+> **叙事**：仓内 SOFA/GBDT 紧迫度；**不**读取 decision 风险分；轨迹协议齐备前不宣称 online MIMIC-PPO
 
 ## 数据
 
@@ -36,9 +37,9 @@
 ## λ 调参（B · 2026-08-02）
 
 - **quick 16 组 + 完整 256 组合 calib 实验完成** → `reports/lambda_tuning_*.csv|json`（不入库）
-- 推荐候选：`wait=0.5, overload=0.1, balance=0.1, zone_mismatch=0.1`（**未写回**，待队友确认 6 场景）
+- 推荐候选已写回 `optimizer.yaml`：`wait=0.5, overload=0.1, balance=0.1, zone_mismatch=0.1`（+ occupancy 2.0）
 - **eval 30% 验证通过**（无过拟合，指标优于 calib）
-- 详见 [`LAMBDA_TUNING.md`](LAMBDA_TUNING.md)
+- 详见 [`LAMBDA_TUNING.md`](LAMBDA_TUNING.md) · 约束边界见 [`PARAM_STORY.md`](PARAM_STORY.md)
 
 ## 调参 / 可视化
 
@@ -47,7 +48,11 @@
 | Streamlit | `streamlit run presentation/streamlit_app.py` |
 | MLflow | `mlflow ui --backend-store-uri sqlite:///./mlflow.db` |
 | 说明 | [`TUNING_LOCAL.md`](TUNING_LOCAL.md) |
-| PPO smoke | [`PPO_SMOKE.md`](PPO_SMOKE.md) · 代码在 main · **默认 cp_sat** · 无 MIMIC 轨迹 |
+| PPO smoke | [`PPO_SMOKE.md`](PPO_SMOKE.md) · 代码在 main · **默认 cp_sat** · 轨迹协议见 [`TRAJECTORY_PROTOCOL.md`](TRAJECTORY_PROTOCOL.md) |
+| 约束规则 | [`constraint_rules.yaml`](../configs/constraint_rules.yaml) · explain 披露启发式边界 |
+| RL 权重 | `optimizer.yaml` → `rl.reward_weights`（与 λ 解耦，含 occupancy） |
+| SOTA 对标 | [`SOTA_SURVEY.md`](SOTA_SURVEY.md) · 假设 H1–H3 |
+| 数据飞轮 | [`DATA_FLYWHEEL.md`](DATA_FLYWHEEL.md) · `reports/flywheel/`（simulate / evaluate_ppo 自动归档） |
 
 ## 说明
 

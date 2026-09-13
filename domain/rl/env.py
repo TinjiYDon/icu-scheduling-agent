@@ -38,6 +38,7 @@ DEFAULT_REWARD_WEIGHTS = {
     "overload": 1.0,
     "balance": 0.1,
     "zone_mismatch": 0.5,
+    "occupancy": 2.0,
 }
 
 
@@ -156,6 +157,7 @@ class ICUEnv(gym.Env):
             "overload": 0.0,
             "balance": 0.0,
             "zone_mismatch": 0.0,
+            "occupancy": 0.0,
             "invalid": 0.0,
         }
         valid_mask = self.action_masks()
@@ -182,6 +184,8 @@ class ICUEnv(gym.Env):
             components["balance"] = (
                 -self.reward_weights["balance"] * self._balance_deviation()
             )
+            occ_ratio = sum(1 for o in self._occupants if o is not None) / max(len(self.beds), 1)
+            components["occupancy"] = self.reward_weights.get("occupancy", 0.0) * occ_ratio
             self.assignments.append(
                 {"stay_id": patient.stay_id, "bed_id": bed.bed_id, "zone": bed.zone}
             )
