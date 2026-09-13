@@ -20,10 +20,9 @@ ICU stays → 仓内 SOFA/GBDT 优先级 → CP-SAT 多目标分床（滚动）�
 1. `docs/ROADMAP.md`（Wave S-LIT / S0–S3 / S-FLY）
 2. `docs/SOTA_SURVEY.md`（**先对标再创新**；无 LIT 不宣称 SOTA）
 3. `docs/DATA_FLYWHEEL.md`
-4. `docs/ROADMAP_EXEC.md`
-5. `docs/PARAM_STORY.md`
-6. `docs/STATUS.md`
-7. `docs/DUMP_READY.md` · `docs/TUNING_LOCAL.md` · `docs/PPO_SMOKE.md` · `docs/TRAJECTORY_PROTOCOL.md`
+4. `docs/PARAM_STORY.md`
+5. `docs/STATUS.md`
+6. `docs/DUMP_READY.md` · `docs/TUNING_LOCAL.md` · `docs/PPO_SMOKE.md` · `docs/TRAJECTORY_PROTOCOL.md`
 
 ## 命令
 

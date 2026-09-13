@@ -35,7 +35,7 @@ independent: zero hard couple; own dump/acceptance/release
 | **S-FLY** | 数据飞轮 | [DATA_FLYWHEEL.md](DATA_FLYWHEEL.md) · `reports/flywheel/` |
 ## 纠正
 
-旧文档「预警风险 → 优先级」**不做**。见 [TOP_TIER_NEXT.md](TOP_TIER_NEXT.md)。
+旧文档「预警风险 → 优先级」**不做**。见上文 vNext 部分。
 
 ## 相关
 

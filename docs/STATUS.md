@@ -11,7 +11,7 @@
 | feat.sofa_timeseries | ✅ 94,458（真实 SOFA · 0~12 · avg 4.74）|
 | dump | ✅ `dumps/icu_scheduling_P0-full_mimic_94458stays_20260802.dump` · 见 [`DUMP_READY.md`](DUMP_READY.md) |
 | 交互台 | ✅ **Plotly Ops 台 v4** 项目/运行/验收 · `.\scripts\run_console.ps1` |
-| 下一步 | [`TOP_TIER_NEXT.md`](TOP_TIER_NEXT.md) |
+| 下一步 | [`ROADMAP.md`](ROADMAP.md) vNext |
 | 交付说明 | [`DUMP_READY.md`](DUMP_READY.md) |
 | simulate | ✅ OPTIMAL · **n_candidates=1000** · assigned=20 |
 
