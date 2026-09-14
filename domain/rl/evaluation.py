@@ -25,4 +25,4 @@ class GreedyPolicy:
 
 
 def evaluate_greedy(env: ICUEnv, seed: int = 42) -> dict:
-    return predict_assignments(GreedyPolicy(env), env, seed=seed)
+    return predict_assignments(GreedyPolicy(env), env, seed=seed, policy_name="greedy")

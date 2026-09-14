@@ -2,7 +2,7 @@
 
 import pytest
 
-from domain.optimizer.cp_sat import run_assignment
+from domain.optimizer.cp_sat import _resolve_bed_zones, run_assignment
 
 
 class _FakeResult:
@@ -27,7 +27,12 @@ class _FakeConn:
         return False
 
     def execute(self, *args, **kwargs):
-        return _FakeResult(self._rows)
+        params = kwargs or (args[1] if len(args) > 1 else {})
+        stay_ids = params.get("stay_ids") if isinstance(params, dict) else None
+        if stay_ids is None:
+            return _FakeResult(self._rows)
+        allowed = {int(stay_id) for stay_id in stay_ids}
+        return _FakeResult([row for row in self._rows if row["stay_id"] in allowed])
 
 
 class _FakeEngine:
@@ -92,6 +97,13 @@ def test_split_none_uses_all_candidates(fake_db):
     assert out["split_meta"] is None
 
 
+def test_stay_ids_filter_limits_candidates(fake_db):
+    out = run_assignment(stay_ids=[3, 5, 7], persist=False)
+
+    assert out["n_stays"] == 3
+    assert {row["stay_id"] for row in out["top_assignments"]}.issubset({3, 5, 7})
+
+
 def test_split_calib_eval_disjoint_and_meta(fake_db):
     calib = run_assignment(split="calib", persist=False)
     ev = run_assignment(split="eval", persist=False)
@@ -105,6 +117,18 @@ def test_split_calib_eval_disjoint_and_meta(fake_db):
     calib_ids = {a["stay_id"] for a in calib["top_assignments"]}
     eval_ids = {a["stay_id"] for a in ev["top_assignments"]}
     assert calib_ids.isdisjoint(eval_ids)
+
+
+def test_bed_zones_clipped_for_any_n_beds():
+    """n_beds must be tunable: zone maps never exceed available beds."""
+    cfg = [[1, 4, "ISO"], [5, 4, "MICU"], [9, 4, "SICU"], [13, 4, "CCU"], [17, 4, "NICU"]]
+    for nb in range(1, 41):
+        label, start, count = _resolve_bed_zones(nb, cfg)
+        for bed in label:
+            assert 1 <= bed <= nb
+        for zone, s in start.items():
+            assert s <= nb
+            assert s + count[zone] - 1 <= nb
 
 
 def test_evaluation_has_business_metrics(fake_db):

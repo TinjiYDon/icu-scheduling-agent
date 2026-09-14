@@ -30,6 +30,10 @@
 | 5 | λ 网格搜索（quick + 完整 256）| quick 16 组 + 完整 256 组 calib 实验 + eval 验证，推荐值待队友确认 | 08-01/02 |
 | 6 | 可解释输出 | `explain.py` CLI + 队友 v4 面板 plan["explain"] 接入 | 08-01 |
 | 7 | PPO 训练 | 完整 200K 步，`artifacts/ppo_icu.zip`，评估 PPO≈Greedy | 08-02 |
+| 8 | PPO 深入对比 | `application/evaluate_ppo_benchmark.py` 同候选规模多 episode 评估 | 08-04 |
+| 9 | 面板前端可解释 | KPI help / 三图各占一行+解释 / 坐标轴 / 表格列说明 | 08-05 |
+| 10 | 参数真实生效 | `n_beds` 可调、`candidate_cap`/`max_time` 生效、改参数自动重跑 | 08-05/06 |
+| 11 | 滚动每步 CP-SAT | `engine.py` 每步真重优化 + f5 挪床惩罚 + 呼吸机 SOFA 驱动 | 08-06 |
 
 ---
 
@@ -37,7 +41,6 @@
 
 | # | 任务 | 说明 | 阻塞/前置 |
 |:-:|------|------|:--:|
-| 11 | PPO 深入对比 | 统一评估场景（PPO/CP-SAT 同候选规模）+ 多 episode 评估 | 队友确认 |
 | 12 | λ 推荐值确认 | 队友 C 确认 6 场景后再写回 `optimizer.yaml` | 队友 |
 
 ## 📌 队友待完成

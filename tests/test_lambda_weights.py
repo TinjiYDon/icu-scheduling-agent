@@ -16,6 +16,7 @@ def test_lambda_defaults_include_all_objectives():
         "balance": 0.1,
         "zone_mismatch": 0.5,
         "occupancy": 2.0,
+        "move": 0.5,
     }
 
 
@@ -31,6 +32,7 @@ def test_lambda_override_does_not_mutate_other_weights():
         "balance": 0.25,
         "zone_mismatch": 1.5,
         "occupancy": 2.0,
+        "move": 0.5,
     }
 
 
@@ -55,6 +57,7 @@ def test_lambda_rejects_all_zero():
                 "balance": 0,
                 "zone_mismatch": 0,
                 "occupancy": 0,
+                "move": 0,
             },
         )
 

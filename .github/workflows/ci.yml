@@ -1,0 +1,36 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: |
+          python -m pip install -U pip
+          pip install -e ".[dev]"
+
+      - name: Unit tests (no DB)
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          pytest \
+            tests/test_plan.py \
+            tests/test_simulate_metrics.py \
+            tests/test_rl_env.py \
+            tests/test_rl_data_adapter.py \
+            tests/test_rl_policy.py \
+            tests/test_ppo_training_smoke.py \
+            tests/test_mcp_optimize.py \
+            -q --tb=line

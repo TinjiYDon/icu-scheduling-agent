@@ -7,8 +7,16 @@ isolation:
     - cvicu
     - nsicu
 ventilator:
-  mode: stay_hash_pct  # stay_hash_pct | none
-  hash_pct: 35  # ~35% of stays marked as needing a ventilator (deterministic)
+  mode: sofa_weighted  # sofa_weighted | stay_hash_pct | none
+  hash_pct: 35  # used only when mode=stay_hash_pct (~35%, deterministic)
+  # SOFA-driven curve (mode=sofa_weighted): higher SOFA → higher vent probability
+  sofa_high_threshold: 10
+  sofa_mid_threshold: 6
+  sofa_high_pct: 90
+  sofa_mid_pct: 55
+  sofa_low_pct: 20
 disclosure: >
   Isolation/ventilator demands are configurable heuristics for solver demos.
-  They are NOT derived from real device orders or infection flags in MIMIC.
+  Ventilator demand is SOFA-driven (sofa_weighted) or a flat deterministic
+  hash rate (stay_hash_pct). These are NOT derived from real device orders or
+  infection flags in MIMIC.

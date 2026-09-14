@@ -10,7 +10,7 @@ import math
 from typing import Mapping
 
 from ortools.sat.python import cp_model
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
 from infra.config import load_yaml
 from infra.db import get_engine
@@ -43,9 +43,9 @@ def _zone_label(zone_idx: int) -> str:
     return ["UNK", "MICU", "SICU", "CCU", "NICU"][zone_idx] if 0 <= zone_idx <= 4 else "UNK"
 
 
-def _needs_ventilator(stay_id: int) -> bool:
-    """Backward-compatible wrapper → configs/constraint_rules.yaml."""
-    return needs_ventilator(int(stay_id))
+def _needs_ventilator(stay_id: int, sofa_total: float = 0.0) -> bool:
+    """Wrapper → configs/constraint_rules.yaml (stay_hash_pct | sofa_weighted)."""
+    return needs_ventilator(int(stay_id), sofa_total)
 
 
 _LAMBDA_DEFAULTS = {
@@ -54,6 +54,7 @@ _LAMBDA_DEFAULTS = {
     "balance": 0.1,
     "zone_mismatch": 0.5,
     "occupancy": 2.0,  # encourage filling free beds when hard-feasible
+    "move": 0.5,  # 挪床惩罚：已有患者换床的惩罚权重（临床稳定性）
 }
 
 
@@ -100,12 +101,42 @@ def _objective_coefficient(
     return max(1, round(weight * scale / max(int(upper_bound), 1)))
 
 
+def _resolve_bed_zones(
+    n_beds: int, bed_zones_cfg: object | None = None
+) -> tuple[dict[int, str], dict[str, int], dict[str, int]]:
+    """Build bed→zone maps clipped to n_beds (beds are 1-indexed 1..n_beds).
+
+    The default bed_zones layout assumes a 20-bed unit. When n_beds differs,
+    zones are clipped so every lookup stays within 1..n_beds (no KeyError).
+    Zones falling entirely beyond n_beds are dropped.
+    """
+    cfg = bed_zones_cfg or [
+        [1, 4, "ISO"], [5, 4, "MICU"], [9, 4, "SICU"], [13, 4, "CCU"], [17, 4, "NICU"],
+    ]
+    label: dict[int, str] = {}
+    start: dict[str, int] = {}
+    count: dict[str, int] = {}
+    for raw_start, raw_count, zone in cfg:
+        zone_start = int(raw_start)
+        zone_count = int(raw_count)
+        if zone_start > n_beds:
+            continue  # zone entirely beyond available beds
+        zone_end = min(zone_start + zone_count, n_beds + 1)
+        start[str(zone)] = zone_start
+        count[str(zone)] = max(0, zone_end - zone_start)
+        for bed in range(zone_start, zone_end):
+            label[bed] = str(zone)
+    return label, start, count
+
+
 def run_assignment(
     run_id: str | None = None,
     lambda_weights: Mapping[str, float] | None = None,
     *,
     persist: bool = True,
     split: str | None = None,
+    stay_ids: list[int] | None = None,
+    occupied_beds: Mapping[int, int] | None = None,
 ) -> dict:
     """Run CP-SAT bed assignment.
 
@@ -115,6 +146,11 @@ def run_assignment(
         persist: whether to write assignments into sched.assignments.
         split: restrict candidates to "calib" (70% tuning) or "eval" (30%
             report-only) per eval_split config. None = all candidates.
+        stay_ids: optional explicit candidate stay IDs for matched comparisons
+            (used by the rolling engine's per-step re-optimization).
+        occupied_beds: optional mapping stay_id → current bed_id for patients
+            already admitted. Assigning such a patient to a different bed adds
+            a move penalty (f5) so re-optimization keeps patients stable.
     """
     if split is not None and split not in ("calib", "eval"):
         raise ValueError("split must be 'calib', 'eval' or None")
@@ -122,6 +158,32 @@ def run_assignment(
     lam = _resolve_lambda_weights(opt.get("lambda", {}), lambda_weights)
     resources = dict(opt.get("resources") or {})
     n_beds = int(resources.get("n_beds", 20))
+    if stay_ids is not None and len(stay_ids) == 0:
+        return {
+            "run_id": run_id or f"p0_{uuid.uuid4().hex[:8]}",
+            "assigned": 0,
+            "n_beds": n_beds,
+            "n_stays": 0,
+            "lambda": lam,
+            "split": split,
+            "split_meta": None,
+            "status": "empty",
+            "evaluation": {
+                "assignment_rate": 0.0,
+                "priority_total": 0.0,
+                "avg_assigned_priority": 0.0,
+                "high_risk_assigned_rate": 1.0,
+                "overload_penalty": 0,
+                "balance_deviation": 0,
+                "zone_match_rate": 0.0,
+                "solve_time_seconds": 0.0,
+                "unassigned": 0,
+                "high_risk_waiting": 0,
+                "avg_assigned_sofa": 0.0,
+                "isolation_utilization": 0.0,
+                "ventilator_utilization": 0.0,
+            },
+        }
     bed_zones_cfg = resources.get("bed_zones") or []
     # Auto-heal stale 20-bed zone maps when n_beds was changed in the UI.
     if not layout_covers_beds(bed_zones_cfg, n_beds):
@@ -130,37 +192,53 @@ def run_assignment(
         bed_zones_cfg = scaled["bed_zones"]
     n_iso_beds = int(resources.get("n_isolation_beds", max(1, n_beds // 5)))
     n_vents = int(resources.get("n_ventilators", max(1, round(n_beds * 8 / 20))))
-    max_patients = int(resources.get("max_patients", n_beds * 10))
+    max_patients = int(
+        (opt.get("solver") or {}).get("candidate_cap")
+        or resources.get("max_patients", n_beds * 10)
+    )
     n_iso_beds = min(n_iso_beds, n_beds)
-    # Build bed_id → zone_label lookup (bed_id is 1-indexed)
-    bed_zone_label: dict[int, str] = {}
-    bed_zone_start: dict[str, int] = {}
-    bed_zone_count: dict[str, int] = {}
-    for start, count, label in bed_zones_cfg:
-        for b in range(int(start), int(start) + int(count)):
-            bed_zone_label[b] = str(label)
-        bed_zone_start[str(label)] = int(start)
-        bed_zone_count[str(label)] = int(count)
+    # Build bed_id → zone_label lookup (bed_id is 1-indexed), clipped to n_beds
+    # so n_beds can be tuned freely without KeyError on zone bounds.
+    bed_zone_label, bed_zone_start, bed_zone_count = _resolve_bed_zones(
+        n_beds, bed_zones_cfg
+    )
     run_id = run_id or f"p0_{uuid.uuid4().hex[:8]}"
 
     # ── 1. Load patients ──────────────────────────────────────────
     engine = get_engine()
     with engine.connect() as conn:
-        rows = conn.execute(
-            text(
-                """
-                SELECT s.stay_id, COALESCE(p.priority_weight, 1.0) AS priority_weight,
-                       COALESCE(so.sofa_total, 0) AS sofa_total,
-                       s.first_careunit
-                FROM staging.icustays s
-                LEFT JOIN feat.patient_priority p ON s.stay_id = p.stay_id
-                LEFT JOIN feat.sofa_timeseries so ON s.stay_id = so.stay_id AND so.hour_index = 0
-                ORDER BY priority_weight DESC, sofa_total DESC, s.stay_id
-                LIMIT :max_patients
-                """
-            ),
-            {"max_patients": max_patients},
-        ).mappings().all()
+        if stay_ids is not None:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT s.stay_id, COALESCE(p.priority_weight, 1.0) AS priority_weight,
+                           COALESCE(so.sofa_total, 0) AS sofa_total,
+                           s.first_careunit
+                    FROM staging.icustays s
+                    LEFT JOIN feat.patient_priority p ON s.stay_id = p.stay_id
+                    LEFT JOIN feat.sofa_timeseries so ON s.stay_id = so.stay_id AND so.hour_index = 0
+                    WHERE s.stay_id IN :stay_ids
+                    ORDER BY priority_weight DESC, sofa_total DESC, s.stay_id
+                    """
+                ).bindparams(bindparam("stay_ids", expanding=True)),
+                {"stay_ids": [int(stay_id) for stay_id in stay_ids]},
+            ).mappings().all()
+        else:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT s.stay_id, COALESCE(p.priority_weight, 1.0) AS priority_weight,
+                           COALESCE(so.sofa_total, 0) AS sofa_total,
+                           s.first_careunit
+                    FROM staging.icustays s
+                    LEFT JOIN feat.patient_priority p ON s.stay_id = p.stay_id
+                    LEFT JOIN feat.sofa_timeseries so ON s.stay_id = so.stay_id AND so.hour_index = 0
+                    ORDER BY priority_weight DESC, sofa_total DESC, s.stay_id
+                    LIMIT :max_patients
+                    """
+                ),
+                {"max_patients": max_patients},
+            ).mappings().all()
 
     stays = [dict(r) for r in rows]
 
@@ -216,7 +294,7 @@ def run_assignment(
         weights[idx] = int(float(s["priority_weight"]) * 1000)
         cu = s.get("first_careunit")
         iso_flags[idx] = needs_isolation(cu)
-        vent_flags[idx] = needs_ventilator(s["stay_id"])
+        vent_flags[idx] = _needs_ventilator(s["stay_id"], float(s["sofa_total"]))
         patient_zones[idx] = _careunit_zone(cu)
 
     # ── 2. Build CP-SAT model ─────────────────────────────────────
@@ -267,7 +345,7 @@ def run_assignment(
     zone_load_vars = []
     for z in range(4):
         start = z * zone_size
-        end = start + zone_size if z < 3 else n_beds
+        end = min(start + zone_size if z < 3 else n_beds, n_beds)
         span = max(1, end - start)
         zl = model.NewIntVar(0, span, f"zone_load_{z}")
         model.Add(zl == sum(x[i, b] for i in range(n) for b in range(start, end)))
@@ -310,6 +388,23 @@ def run_assignment(
     else:
         model.Add(zone_mismatch_penalty == 0)
 
+    # f₅: move penalty — penalize moving an already-occupied patient to a
+    #     different bed (clinical stability: avoid unnecessary transfers).
+    move_penalty = model.NewIntVar(0, n_beds, "move_penalty")
+    occupied_beds = occupied_beds or {}
+    move_terms = []
+    for i, s in enumerate(stays):
+        current_bed = occupied_beds.get(s["stay_id"])
+        if current_bed is None:
+            continue
+        for b in range(n_beds):
+            if b + 1 != int(current_bed):
+                move_terms.append(x[i, b])
+    if move_terms:
+        model.Add(move_penalty == sum(move_terms))
+    else:
+        model.Add(move_penalty == 0)
+
     # Combined objective
     objective_bounds = {
         "occupancy": max(1, n_beds),
@@ -317,6 +412,7 @@ def run_assignment(
         "overload": max(1, n_beds * max(sofa_vals, default=1)),
         "balance": max(1, n_beds),
         "zone_mismatch": max(1, n_beds),
+        "move": max(1, n_beds),
     }
     objective_coefficients = {
         name: _objective_coefficient(lam[name], objective_bounds[name])
@@ -328,11 +424,14 @@ def run_assignment(
         - objective_coefficients["overload"] * overload_penalty
         - objective_coefficients["balance"] * max_dev
         - objective_coefficients["zone_mismatch"] * zone_mismatch_penalty
+        - objective_coefficients["move"] * move_penalty
     )
 
     # ── 4. Solve ──────────────────────────────────────────────────
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 30.0
+    solver.parameters.max_time_in_seconds = float(
+        (opt.get("solver") or {}).get("max_time_seconds", 30.0)
+    )
     status = solver.Solve(model)
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         raise RuntimeError(f"CP-SAT failed: status={status}")
@@ -421,6 +520,7 @@ def run_assignment(
             "f2_overload_penalty": f2_val,
             "f3_balance_deviation": balance_dev,
             "f4_zone_mismatch": zone_mismatch_val,
+            "f5_move_penalty": solver.Value(move_penalty),
             "zone_loads": zone_vals,
         },
         # These business metrics are independent of lambda coefficients, so

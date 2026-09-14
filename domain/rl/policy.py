@@ -13,7 +13,13 @@ def load_model(model_path: str | Path, env: ICUEnv | None = None):
     return MaskablePPO.load(str(model_path), env=env)
 
 
-def predict_assignments(model, env: ICUEnv, *, seed: int | None = None) -> dict:
+def predict_assignments(
+    model,
+    env: ICUEnv,
+    *,
+    seed: int | None = None,
+    policy_name: str = "ppo",
+) -> dict:
     observation, _ = env.reset(seed=seed)
     terminated = False
     total_reward = 0.0
@@ -31,7 +37,7 @@ def predict_assignments(model, env: ICUEnv, *, seed: int | None = None) -> dict:
         for name, value in info["reward_components"].items():
             reward_totals[name] = reward_totals.get(name, 0.0) + float(value)
     return {
-        "policy": "ppo",
+        "policy": policy_name,
         "assignments": list(env.assignments),
         "assigned": len(env.assignments),
         "n_stays": len(env.patients),
