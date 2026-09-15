@@ -13,7 +13,7 @@
 | [ROADMAP.md](ROADMAP.md) | 下一版本目标 |
 | [DUMP_READY.md](DUMP_READY.md) | **线下 dump 单发 / restore** |
 | [TUNING_LOCAL.md](TUNING_LOCAL.md) | Ops 台启动 |
-| [TOP_TIER_NEXT.md](TOP_TIER_NEXT.md) | 下一步优化 |
+| [ROADMAP.md](ROADMAP.md) | 下一版本目标与下一步 |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | PR 规范 |
 
 ## 角色：A 数据 · B 算法/优化 · C 应用/集成

@@ -25,5 +25,5 @@ calib/eval 划分；simulate 滚动指标入 STATUS。禁止在无 MIMIC 轨迹�
 ## 当前重点
 
 1. Streamlit：CP-SAT + 滚动占用时间线 + 验收门禁（已增强）
-2. 预警风险耦合进 `priority_weight`（配置开关；见 `docs/TOP_TIER_NEXT.md`）
+2. 预警风险耦合进 `priority_weight`（配置开关；见 `docs/ROADMAP.md` vNext）
 3. MIMIC `sim` 轨迹仍可选；默认 `policy.default=cp_sat`
