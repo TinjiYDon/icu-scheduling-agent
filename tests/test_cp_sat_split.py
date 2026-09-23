@@ -153,3 +153,13 @@ def test_evaluation_has_business_metrics(fake_db):
     assert 0.0 <= ev["ventilator_utilization"] <= 1.0
     # avg assigned sofa is non-negative
     assert ev["avg_assigned_sofa"] >= 0.0
+
+
+def test_balance_uses_configured_bed_zones(fake_db):
+    out = run_assignment(split=None, persist=False)
+    objective = out["objective"]
+
+    assert objective["zone_load_labels"] == ["ISO", "MICU", "SICU", "CCU", "NICU"]
+    assert objective["zone_capacities"] == [4, 4, 4, 4, 4]
+    assert objective["balance_scale"] == 4
+    assert len(objective["zone_loads"]) == 5

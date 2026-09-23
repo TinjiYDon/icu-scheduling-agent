@@ -11,6 +11,7 @@ def test_lambda_defaults_include_all_objectives():
     weights = _resolve_lambda_weights({})
 
     assert weights == {
+        "high_risk": 0.0,
         "wait": 10.0,
         "overload": 1.0,
         "balance": 0.1,
@@ -27,6 +28,7 @@ def test_lambda_override_does_not_mutate_other_weights():
     )
 
     assert weights == {
+        "high_risk": 0.0,
         "wait": 2.0,
         "overload": 1.0,
         "balance": 0.25,
@@ -52,6 +54,7 @@ def test_lambda_rejects_all_zero():
         _resolve_lambda_weights(
             {},
             {
+                "high_risk": 0,
                 "wait": 0,
                 "overload": 0,
                 "balance": 0,
