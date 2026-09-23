@@ -33,4 +33,7 @@ jobs:
             tests/test_rl_policy.py \
             tests/test_ppo_training_smoke.py \
             tests/test_mcp_optimize.py \
+            tests/test_compare_policies.py \
+            tests/test_trajectory_export.py \
+            tests/test_flywheel_archive.py \
             -q --tb=line
