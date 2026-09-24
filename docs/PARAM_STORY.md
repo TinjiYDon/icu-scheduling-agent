@@ -10,7 +10,9 @@
 | `priority_weight` | 越高越优先占床 | 仓内 GBDT 或 SOFA 规则 → `feat.patient_priority` |
 | SOFA（简化） | 肌酐/胆红素/血小板 → renal/liver/coag | `domain/scoring/sofa.py`（需 Layer0 labs） |
 | CP-SAT | 0-1 分配 stay↔bed | `domain/optimizer/cp_sat.py` → `sched.assignments` |
-| lambda.* | 多目标权重 | `configs/optimizer.yaml`（wait/overload/balance/zone；occupancy） |
+| lambda.* | 多目标权重 | `configs/optimizer.yaml`；键名兼容，语义见 [S2_MULTI_OBJECTIVE.md](S2_MULTI_OBJECTIVE.md) |
+| `wait`（键） | = `priority_served`：已分配 priority 总和 | **不是**真实等待时长 |
+| `overload`（键） | = 高危(SOFA≥10)落非隔离床的 SOFA 累加 | 低危占普通床不计 |
 
 ## 资源与硬约束（诚实边界）
 

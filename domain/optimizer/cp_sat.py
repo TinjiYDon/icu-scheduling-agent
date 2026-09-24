@@ -23,6 +23,13 @@ from domain.optimizer.multiobjective import (
     normalized_coefficient,
     solve_multiobjective,
 )
+from domain.optimizer.objective_semantics import (
+    HIGH_RISK_SOFA,
+    OBJECTIVE_SEMANTICS,
+    count_high_risk_on_regular,
+    is_high_risk_sofa,
+    sum_overload_from_assignments,
+)
 from domain.optimizer.resources import layout_covers_beds, scale_bed_layout
 from infra.config import load_yaml
 from infra.db import get_engine
@@ -346,23 +353,34 @@ def run_assignment(
     # f₀: occupancy — fill free beds when hard constraints allow
     occupancy = sum(x[i, b] for i in range(n) for b in range(n_beds))
 
-    # f₁: maximize priority_weight (minimize wait for high-risk patients)
+    # f₁: priority_served (lambda key still ``wait``; not wall-clock wait)
     f1 = sum(weights[i] * x[i, b] for i in range(n) for b in range(n_beds))
 
     # Clinical priority: count assigned high-risk patients explicitly instead
     # of relying on a weighted-sum coefficient to imply the hierarchy.
-    high_risk_indices = [i for i, s in enumerate(stays) if float(s["sofa_total"]) >= 10]
+    high_risk_indices = [
+        i for i, s in enumerate(stays) if is_high_risk_sofa(s["sofa_total"])
+    ]
     high_risk_served = model.NewIntVar(0, len(high_risk_indices), "high_risk_served")
     model.Add(
         high_risk_served
         == sum(x[i, b] for i in high_risk_indices for b in range(n_beds))
     )
 
-    # f₂: overload penalty — penalize assigning high-sofa patients to regular beds
+    # f₂: overload — acuity mismatch only: SOFA of high-risk on non-ISO beds.
+    # Low-risk patients on regular beds do not contribute.
     sofa_vals = [int(float(s["sofa_total"])) for s in stays]
-    overload_penalty = sum(
-        sofa_vals[i] * x[i, b] for i in range(n) for b in range(n_iso_beds, n_beds)
-    )
+    max_overload = max(1, n_beds * max((sofa_vals[i] for i in high_risk_indices), default=0))
+    overload_penalty = model.NewIntVar(0, max_overload, "overload_penalty")
+    overload_terms = [
+        sofa_vals[i] * x[i, b]
+        for i in high_risk_indices
+        for b in range(n_iso_beds, n_beds)
+    ]
+    if overload_terms:
+        model.Add(overload_penalty == sum(overload_terms))
+    else:
+        model.Add(overload_penalty == 0)
 
     # f₃: balance — compare utilization across the configured bed zones.
     # Loads are normalized to a common integer scale, so unequal zone sizes do
@@ -447,8 +465,15 @@ def run_assignment(
     objective_bounds = {
         "occupancy": max(1, n_beds),
         "high_risk": max(1, len(high_risk_indices)),
-        "wait": max(1, n_beds * max(weights, default=1)),
-        "overload": max(1, n_beds * max(sofa_vals, default=1)),
+        "wait": max(
+            1,
+            n_beds * max(weights, default=1),
+        ),
+        "overload": max(
+            1,
+            n_beds
+            * max((sofa_vals[i] for i in high_risk_indices), default=HIGH_RISK_SOFA),
+        ),
         "balance": max(1, balance_scale),
         "zone_mismatch": max(1, n_beds),
         "move": max(1, n_beds),
@@ -532,11 +557,8 @@ def run_assignment(
     f1_val = sum(
         weights[i] * solver.Value(x[i, b]) for i in range(n) for b in range(n_beds)
     )
-    f2_val = sum(
-        sofa_vals[i] * solver.Value(x[i, b])
-        for i in range(n)
-        for b in range(n_iso_beds, n_beds)
-    )
+    f2_val = sum_overload_from_assignments(assignments)
+    high_risk_on_regular = count_high_risk_on_regular(assignments)
     zone_vals = [solver.Value(zl) for zl in zone_load_vars]
     balance_dev = solver.Value(max_dev)
 
@@ -544,8 +566,10 @@ def run_assignment(
     n_vent_used = sum(1 for a in assignments if a["needs_vent"])
     n_zone_match = sum(1 for a in assignments if a.get("zone_match"))
     zone_mismatch_val = solver.Value(zone_mismatch_penalty)
-    high_risk_total = sum(1 for s in stays if float(s["sofa_total"]) >= 10)
-    high_risk_assigned = sum(1 for a in assignments if float(a["sofa_total"]) >= 10)
+    high_risk_total = sum(1 for s in stays if is_high_risk_sofa(s["sofa_total"]))
+    high_risk_assigned = sum(
+        1 for a in assignments if is_high_risk_sofa(a["sofa_total"])
+    )
     assigned_priority_total = sum(float(a["priority_weight"]) for a in assignments)
     assigned_sofa_total = sum(float(a["sofa_total"]) for a in assignments)
     assigned_count = len(assignments)
@@ -558,6 +582,7 @@ def run_assignment(
         "solver_status": "OPTIMAL" if status == cp_model.OPTIMAL else "FEASIBLE",
         "lambda": lam,
         "objective_mode": objective_mode,
+        "objective_semantics": OBJECTIVE_SEMANTICS,
         "multiobjective": {
             "primary": epsilon_primary if objective_mode == "epsilon_constraint" else None,
             "epsilon_bounds": dict(epsilon_bounds or {}),
@@ -579,7 +604,9 @@ def run_assignment(
             "f0_occupancy": assigned_count,
             "f0b_high_risk_served": multiobjective.objective_values["high_risk"],
             "f1_priority_total": f1_val,
+            "f1_priority_served": assigned_priority_total,
             "f2_overload_penalty": f2_val,
+            "f2_high_risk_on_regular_sofa": f2_val,
             "f3_balance_deviation": balance_dev,
             "f4_zone_mismatch": zone_mismatch_val,
             "f5_move_penalty": solver.Value(move_penalty),
@@ -593,6 +620,7 @@ def run_assignment(
         "evaluation": {
             "assignment_rate": round(assigned_count / n, 4),
             "priority_total": round(assigned_priority_total, 4),
+            "priority_served": round(assigned_priority_total, 4),
             "avg_assigned_priority": round(
                 assigned_priority_total / assigned_count, 4
             ) if assigned_count else 0.0,
@@ -600,6 +628,8 @@ def run_assignment(
                 high_risk_assigned / high_risk_total, 4
             ) if high_risk_total else 1.0,
             "overload_penalty": f2_val,
+            "high_risk_on_regular": high_risk_on_regular,
+            "high_risk_on_regular_sofa": f2_val,
             "balance_deviation": balance_dev,
             "zone_match_rate": round(
                 n_zone_match / assigned_count, 4

@@ -1,6 +1,6 @@
 # S2-MOO：多目标求解方法对照
 
-> 状态：阶段 1（统一求解内核）完成；阶段 2（指标语义）进行中
+> 状态：阶段 1 ✅ · **阶段 2 ✅（2026-09-24）** · 下一拍阶段 3（ε 网格 / payoff）
 >
 > 范围：同一 ICU 候选池、床位资源和硬约束下，对比 Weighted Sum、Lexicographic 与 ε-Constraint。
 >
@@ -26,19 +26,19 @@
 
 硬约束不参与目标权衡。任何方法都不能通过违反硬约束换取更好的目标值。
 
-### 阶段 1 共用目标
+### 阶段 2 共用目标（语义已校正）
 
-| 名称 | 方向 | 当前表达式 | 说明 |
+| λ 键名 | 方向 | 表达式（canonical） | 说明 |
 |---|---:|---|---|
-| `occupancy` | max | 已分配患者数 | 先保证可行床位得到使用 |
-| `high_risk` | max | 已分配的 SOFA≥10 患者数 | 显式表达临床优先；旧加权基线中权重为 0 |
-| `wait` | max | 已分配患者优先级总和 | 兼容旧字段；严格说是 `priority_served`，不是真实等待时长 |
-| `overload` | min | 普通床上的 SOFA 总量 | 现有高病情负荷代理，阶段 2 需复核临床语义 |
+| `occupancy` | max | 已分配患者数 (`beds_filled`) | 先保证可行床位得到使用 |
+| `high_risk` | max | 已分配 SOFA≥10 数 (`high_risk_served`) | 显式临床优先 |
+| `wait` | max | Σ priority_weight (`priority_served`) | **兼容旧键**；不是真实等待时长 |
+| `overload` | min | SOFA≥10 且非隔离床的 SOFA 累加 (`high_risk_on_regular_beds`) | **acuity 错配**；低危占普通床不计 |
 | `zone_mismatch` | min | 非偏好科室分配数 | 降低跨区安置 |
-| `move` | min | 已在床患者换床数 | 滚动场景的稳定性目标 |
-| `balance` | min | 分区负载最大偏差 | 阶段 2 改为按配置床区计算的标准化利用率差 |
+| `move` | min | 已在床患者换床数 | 滚动场景稳定性 |
+| `balance` | min | 配置床区标准化利用率 max−min | 区大小不等时公平比较 |
 
-三种方法必须共享上述表达式，不能分别使用不同指标后再比较。
+披露字段：`result["objective_semantics"]` · `evaluation.priority_served` · `evaluation.high_risk_on_regular`。
 
 ## 三种求解策略
 
@@ -83,7 +83,7 @@ balance <= ε_balance
 | 阶段 | 内容 | 验收 |
 |---|---|---|
 | 1 ✅ | 统一目标规格；三种求解模式；阶段状态与累计时间 | 玩具模型单测 + 真实 MIMIC 只读求解 |
-| 2 ◐ | 目标语义修正：显式高危目标、按真实床区计算公平性；待处理 `wait` 命名与 overload 语义 | 指标与配置一致；旧接口兼容 |
+| 2 ✅ | 目标语义：`wait`→priority_served 披露；`overload`→高危落普通床；balance 区标准化 | `tests/test_objective_semantics.py`；旧 λ 键兼容 |
 | 3 | payoff table、ε 网格、非支配解与 hypervolume | 可复现实验 CSV/JSON |
 | 4 | 六场景对照与 calib/eval 报告 | 相同实例、相同时间预算、统一结果表 |
 | 5 | Streamlit 展示与论文表格 | 方法、Pareto 与敏感性图可解释 |

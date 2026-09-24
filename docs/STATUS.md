@@ -1,6 +1,6 @@
 # 项目状态
 
-> 更新：2026-09-24 · **独立调度** · **S2-MOO（H4）** + **S2-TRAJ 导出验收** · 默认 CP-SAT  
+> 更新：2026-09-24 · **独立调度** · **S2-MOO（H4）** + 阶段2语义 + **S2-TRAJ** · 默认 CP-SAT  
 > **叙事**：仓内 SOFA/GBDT；**不**读 decision 风险分；有轨迹包仍**不**宣称 online MIMIC-PPO  
 > 方向：[TEAM_DIRECTION.md](TEAM_DIRECTION.md) · 整合：[INTEGRATION_PREP.md](INTEGRATION_PREP.md) · [S2_MULTI_OBJECTIVE.md](S2_MULTI_OBJECTIVE.md)
 
@@ -49,6 +49,7 @@
 | Streamlit | `streamlit run presentation/streamlit_app.py` |
 | MLflow | `mlflow ui --backend-store-uri sqlite:///./mlflow.db` |
 | 说明 | [`TUNING_LOCAL.md`](TUNING_LOCAL.md) |
+| S2-MOO | ✅ PR#10 三模式 · **阶段 2**：`overload`=高危落普通床 SOFA；`wait`≡priority_served · 见 [`S2_MULTI_OBJECTIVE.md`](S2_MULTI_OBJECTIVE.md) |
 | S2-TRAJ | ✅ 协议 1.0 导出验收 · `export_trajectory --steps 4` + schema 单测 · 见 [`TRAJECTORY_PROTOCOL.md`](TRAJECTORY_PROTOCOL.md) |
 | PPO smoke | [`PPO_SMOKE.md`](PPO_SMOKE.md) · 代码在 main · **默认 cp_sat** · 离线轨迹≠ online |
 | 约束规则 | [`constraint_rules.yaml`](../configs/constraint_rules.yaml) · explain 披露启发式边界 |

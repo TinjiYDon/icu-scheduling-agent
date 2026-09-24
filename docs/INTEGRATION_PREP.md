@@ -23,8 +23,8 @@
 | ID | 项 | 状态 |
 |----|----|------|
 | C1 | S2-TRAJ 导出验收对照 `TRAJECTORY_PROTOCOL.md` | ✅ 2026-09-24 |
-| C2 | MOO 阶段 2：wait/overload 语义 | **下一拍** |
-| C3 | STATUS 写入三模式对照表（真数） | 待本机 |
+| C2 | MOO 阶段 2：wait/overload 语义 | ✅ 2026-09-24（acuity overload） |
+| C3 | STATUS 写入三模式对照表（真数） | 待本机（阶段 3/4） |
 | C4 | Streamlit 三模式 UI | P2 |
 
 ## 禁区
