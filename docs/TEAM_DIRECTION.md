@@ -29,6 +29,6 @@ $env:PYTHONPATH = (Get-Location)
 ```text
 SSOT: docs/STATUS.md · docs/TEAM_DIRECTION.md · docs/S2_MULTI_OBJECTIVE.md
 adopted: S2-MOO = H4
-next: MOO phase3 epsilon grid / payoff table
+next: MOO phase4 six-scenario pack
 禁区: dumps/ · decision risk_score
 ```

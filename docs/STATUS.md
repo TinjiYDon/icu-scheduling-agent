@@ -57,6 +57,16 @@
 | SOTA 对标 | [`SOTA_SURVEY.md`](SOTA_SURVEY.md) · 假设 H1–H3 |
 | 数据飞轮 | [`DATA_FLYWHEEL.md`](DATA_FLYWHEEL.md) · `reports/flywheel/`（simulate / evaluate_ppo 自动归档） |
 
+## S2-MOO 阶段 3 摘要（calib · 2026-09-24）
+
+| 方法 | 状态 | occ | high_risk | wait | overload | 耗时 |
+|------|------|----:|----------:|-----:|---------:|-----:|
+| Weighted Sum | OPTIMAL | 20 | 4 | 57937 | 0 | 1.79s |
+| Lexicographic | OPTIMAL（严格） | 20 | 12 | 58892 | 84 | 15.95s |
+| ε-grid A2 | 81 点 · 可行 54 · 非支配 **4** | — | — | HV=**0.038794** | — | ~3min |
+
+验收命令：`python -m application.run_moo_phase3 --split calib --levels 3`
+
 ## 说明
 
 - `candidate_cap` 只限制 CP-SAT 候选，**不**裁剪 labs/SOFA/feat
