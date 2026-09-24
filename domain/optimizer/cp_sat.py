@@ -152,6 +152,7 @@ def run_assignment(
     objective_order: Sequence[str] | None = None,
     epsilon_primary: str = "wait",
     epsilon_bounds: Mapping[str, int | float] | None = None,
+    max_time_seconds: float | None = None,
 ) -> dict:
     """Run CP-SAT bed assignment.
 
@@ -171,6 +172,7 @@ def run_assignment(
         objective_order: priority order for lexicographic optimization.
         epsilon_primary: objective optimized by epsilon-constraint mode.
         epsilon_bounds: direction-aware bounds for all non-primary objectives.
+        max_time_seconds: optional CP-SAT wall-time override (phase-3 grids).
     """
     if split is not None and split not in ("calib", "eval"):
         raise ValueError("split must be 'calib', 'eval' or None")
@@ -178,6 +180,11 @@ def run_assignment(
     lam = _resolve_lambda_weights(opt.get("lambda", {}), lambda_weights)
     resources = dict(opt.get("resources") or {})
     n_beds = int(resources.get("n_beds", 20))
+    solver_time = float(
+        max_time_seconds
+        if max_time_seconds is not None
+        else (opt.get("solver") or {}).get("max_time_seconds", 30.0)
+    )
     if stay_ids is not None and len(stay_ids) == 0:
         return {
             "run_id": run_id or f"p0_{uuid.uuid4().hex[:8]}",
@@ -501,9 +508,7 @@ def run_assignment(
         objective_order=objective_order,
         epsilon_primary=epsilon_primary,
         epsilon_bounds=epsilon_bounds,
-        max_time_seconds=float(
-            (opt.get("solver") or {}).get("max_time_seconds", 30.0)
-        ),
+        max_time_seconds=solver_time,
     )
     solver = multiobjective.solver
     status = multiobjective.status

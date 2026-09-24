@@ -1,6 +1,6 @@
 # Roadmap · icu-scheduling-agent
 
-> 更新：2026-09-24（S2-TRAJ ✅ · MOO 阶段 2 ✅；下一拍阶段 3 ε 网格）  
+> 更新：2026-09-24（S2-TRAJ ✅ · MOO 阶段 2/3 ✅；下一拍阶段 4 六场景）  
 > 人读：多目标多约束滚动调度；默认 CP-SAT；不接 decision 风险分。  
 > AI：**S2-MOO** ≠ **S2-TRAJ**；有离线轨迹仍不宣称 online MIMIC-PPO。
 
@@ -8,10 +8,10 @@
 
 ```text
 repo: icu-scheduling-agent
-adopted: S2-MOO weighted/lex/epsilon; S2-TRAJ export; MOO phase2 acuity overload
-vnext_p0: S2-MOO phase3 payoff/epsilon grid
-vnext_p1: calib scenario pack → STATUS
-vnext_p2: Streamlit three-mode UI; S3 RL compare on same pool
+adopted: S2-MOO p1-p3; S2-TRAJ; acuity overload semantics
+vnext_p0: S2-MOO phase4 six-scenario pack → STATUS
+vnext_p1: Streamlit three-mode UI
+vnext_p2: S3 RL compare on same pool
 forbidden: decision risk_score; claim online PPO from offline traj alone
 ```
 
@@ -32,13 +32,14 @@ forbidden: decision risk_score; claim online PPO from offline traj alone
 | H3 对照表骨架 | CP-SAT / Greedy / PPO 表 | ✅ 部分 | H3 |
 | **S2-TRAJ** | 滚动仿真轨迹协议 1.0 导出验收 | ✅ 2026-09-24 | H3 前置 |
 | **S2-MOO 阶段 2** | wait/overload 语义（acuity） | ✅ 2026-09-24 | H4 |
+| **S2-MOO 阶段 3** | payoff + A2 ε 网格 + HV | ✅ 2026-09-24 | H4 |
 
 ## 下一阶段计划
 
 | 优先级 | 项 | 说明 |
 |--------|----|------|
-| **P0** | S2-MOO 阶段 3 | payoff / ε 网格 / hypervolume |
-| **P1** | payoff / ε 网格 | 阶段 3 Pareto 扫描 |
+| **P0** | S2-MOO 阶段 4 | 六场景对照与 calib/eval 统一表 |
+| **P1** | Streamlit 三模式 | 展示 MOO 结果 |
 | **P1** | calib 场景包 | 写入 STATUS 对照表 |
 | **P2** | Streamlit 三模式 | 展示 MOO 结果 |
 | **P2** | S3 | 同候选池 RL 对照深化 |

@@ -1,6 +1,6 @@
 # S2-MOO：多目标求解方法对照
 
-> 状态：阶段 1 ✅ · **阶段 2 ✅（2026-09-24）** · 下一拍阶段 3（ε 网格 / payoff）
+> 状态：阶段 1 ✅ · 阶段 2 ✅ · **阶段 3 ✅（2026-09-24 · A2 网格）** · 下一拍阶段 4（六场景）
 >
 > 范围：同一 ICU 候选池、床位资源和硬约束下，对比 Weighted Sum、Lexicographic 与 ε-Constraint。
 >
@@ -84,7 +84,7 @@ balance <= ε_balance
 |---|---|---|
 | 1 ✅ | 统一目标规格；三种求解模式；阶段状态与累计时间 | 玩具模型单测 + 真实 MIMIC 只读求解 |
 | 2 ✅ | 目标语义：`wait`→priority_served 披露；`overload`→高危落普通床；balance 区标准化 | `tests/test_objective_semantics.py`；旧 λ 键兼容 |
-| 3 | payoff table、ε 网格、非支配解与 hypervolume | 可复现实验 CSV/JSON |
+| 3 ✅ | payoff table、ε 网格（A2）、非支配解与 hypervolume | `python -m application.run_moo_phase3` → `reports/moo/`；`tests/test_moo_phase3.py` |
 | 4 | 六场景对照与 calib/eval 报告 | 相同实例、相同时间预算、统一结果表 |
 | 5 | Streamlit 展示与论文表格 | 方法、Pareto 与敏感性图可解释 |
 
@@ -98,6 +98,17 @@ balance <= ε_balance
 6. 科室需求不均衡。
 
 每个场景固定患者集合、床位资源、随机种子、硬约束和总求解时间。报告原始目标值、分配率、高危等待、错区率、资源利用率、状态、累计时间与最优性信息。
+
+## 阶段 3 入口（A2）
+
+```powershell
+$env:PYTHONPATH = (Get-Location)
+.\.venv\Scripts\python.exe -m application.run_moo_phase3 --split calib --levels 3 --max-time 15 --baseline-max-time 90
+```
+
+- primary=`wait`；网格=`occupancy,high_risk,overload,balance`×3 档  
+- 产出（**不入 Git**）：`reports/moo/payoff_*.json` · `epsilon_grid_*.csv` · `summary_latest.json`  
+- 单测：`pytest tests/test_moo_phase3.py -q`
 
 ## 代码接口
 
@@ -124,6 +135,20 @@ run_assignment(
     },
 )
 ```
+
+## 阶段 3 验收记录（2026-09-24 · calib · A2）
+
+| 项 | 值 |
+|----|-----|
+| 网格 | primary=`wait`；`occupancy×high_risk×overload×balance` ×3 = **81** |
+| 可行 / 非支配 | **54** / **4** |
+| Hypervolume（归一化 max 形） | **0.038794** |
+| Weighted Sum | OPTIMAL · occ=20 · high_risk=4 · wait=57937 · overload=0 · 1.79s |
+| Lexicographic | OPTIMAL（严格） · occ=20 · high_risk=12 · wait=58892 · overload=84 · 15.95s |
+| 产出 | `reports/moo/summary_latest.json`（不入 Git） |
+
+> payoff ideal：occ=20 / high_risk=12 / wait=58953 / overload=0；nadir：occ=0 / high_risk=0 / wait=0 / overload=83。  
+> 结论口径：ε 网格给出可复现 Pareto 候选；**不**据此宣称某一方法全局最优。
 
 ## 阶段 1 验收记录
 
