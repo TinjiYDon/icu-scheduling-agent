@@ -28,6 +28,7 @@ jobs:
           pytest \
             tests/test_plan.py \
             tests/test_simulate_metrics.py \
+            tests/test_multiobjective.py \
             tests/test_rl_env.py \
             tests/test_rl_data_adapter.py \
             tests/test_rl_policy.py \

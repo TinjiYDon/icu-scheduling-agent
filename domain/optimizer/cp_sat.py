@@ -5,22 +5,27 @@
 
 from __future__ import annotations
 
-import uuid
 import math
-from typing import Mapping
+import uuid
+from collections.abc import Mapping, Sequence
 
 from ortools.sat.python import cp_model
 from sqlalchemy import bindparam, text
 
-from infra.config import load_yaml
-from infra.db import get_engine
-from domain.optimizer.eval_split import split_stay_ids
-from domain.optimizer.resources import layout_covers_beds, scale_bed_layout
 from domain.optimizer.constraint_rules import (
     constraint_disclosure,
     needs_isolation,
     needs_ventilator,
 )
+from domain.optimizer.eval_split import split_stay_ids
+from domain.optimizer.multiobjective import (
+    ObjectiveSpec,
+    normalized_coefficient,
+    solve_multiobjective,
+)
+from domain.optimizer.resources import layout_covers_beds, scale_bed_layout
+from infra.config import load_yaml
+from infra.db import get_engine
 
 
 def _careunit_zone(careunit: str | None) -> int:
@@ -49,6 +54,7 @@ def _needs_ventilator(stay_id: int, sofa_total: float = 0.0) -> bool:
 
 
 _LAMBDA_DEFAULTS = {
+    "high_risk": 0.0,  # explicit S2 objective; zero preserves the tuned legacy baseline
     "wait": 10.0,
     "overload": 1.0,
     "balance": 0.1,
@@ -96,9 +102,7 @@ def _objective_coefficient(
     by each objective's upper bound makes lambda values represent relative
     preference instead of accidental unit size.
     """
-    if weight == 0:
-        return 0
-    return max(1, round(weight * scale / max(int(upper_bound), 1)))
+    return normalized_coefficient(weight, upper_bound, scale)
 
 
 def _resolve_bed_zones(
@@ -137,6 +141,10 @@ def run_assignment(
     split: str | None = None,
     stay_ids: list[int] | None = None,
     occupied_beds: Mapping[int, int] | None = None,
+    objective_mode: str = "weighted_sum",
+    objective_order: Sequence[str] | None = None,
+    epsilon_primary: str = "wait",
+    epsilon_bounds: Mapping[str, int | float] | None = None,
 ) -> dict:
     """Run CP-SAT bed assignment.
 
@@ -151,6 +159,11 @@ def run_assignment(
         occupied_beds: optional mapping stay_id → current bed_id for patients
             already admitted. Assigning such a patient to a different bed adds
             a move penalty (f5) so re-optimization keeps patients stable.
+        objective_mode: ``weighted_sum`` (backward-compatible default),
+            ``lexicographic`` or ``epsilon_constraint``.
+        objective_order: priority order for lexicographic optimization.
+        epsilon_primary: objective optimized by epsilon-constraint mode.
+        epsilon_bounds: direction-aware bounds for all non-primary objectives.
     """
     if split is not None and split not in ("calib", "eval"):
         raise ValueError("split must be 'calib', 'eval' or None")
@@ -165,6 +178,7 @@ def run_assignment(
             "n_beds": n_beds,
             "n_stays": 0,
             "lambda": lam,
+            "objective_mode": objective_mode,
             "split": split,
             "split_meta": None,
             "status": "empty",
@@ -265,6 +279,7 @@ def run_assignment(
             "n_beds": n_beds,
             "n_stays": 0,
             "lambda": lam,
+            "objective_mode": objective_mode,
             "split": split,
             "split_meta": split_meta,
             "status": "empty",
@@ -334,31 +349,54 @@ def run_assignment(
     # f₁: maximize priority_weight (minimize wait for high-risk patients)
     f1 = sum(weights[i] * x[i, b] for i in range(n) for b in range(n_beds))
 
+    # Clinical priority: count assigned high-risk patients explicitly instead
+    # of relying on a weighted-sum coefficient to imply the hierarchy.
+    high_risk_indices = [i for i, s in enumerate(stays) if float(s["sofa_total"]) >= 10]
+    high_risk_served = model.NewIntVar(0, len(high_risk_indices), "high_risk_served")
+    model.Add(
+        high_risk_served
+        == sum(x[i, b] for i in high_risk_indices for b in range(n_beds))
+    )
+
     # f₂: overload penalty — penalize assigning high-sofa patients to regular beds
     sofa_vals = [int(float(s["sofa_total"])) for s in stays]
     overload_penalty = sum(
         sofa_vals[i] * x[i, b] for i in range(n) for b in range(n_iso_beds, n_beds)
     )
 
-    # f₃: balance — minimize max deviation across 4 bed zones
-    zone_size = max(1, n_beds // 4)
+    # f₃: balance — compare utilization across the configured bed zones.
+    # Loads are normalized to a common integer scale, so unequal zone sizes do
+    # not make a larger zone look artificially overloaded.
+    beds_by_zone: dict[str, list[int]] = {}
+    for bed_id in range(1, n_beds + 1):
+        beds_by_zone.setdefault(bed_zone_label.get(bed_id, "REG"), []).append(bed_id - 1)
+    zone_load_labels = list(beds_by_zone)
+    zone_capacities = [len(beds_by_zone[label]) for label in zone_load_labels]
+    balance_scale = math.lcm(*zone_capacities)
     zone_load_vars = []
-    for z in range(4):
-        start = z * zone_size
-        end = min(start + zone_size if z < 3 else n_beds, n_beds)
-        span = max(1, end - start)
-        zl = model.NewIntVar(0, span, f"zone_load_{z}")
-        model.Add(zl == sum(x[i, b] for i in range(n) for b in range(start, end)))
-        zone_load_vars.append(zl)
+    normalized_zone_loads = []
+    for label, capacity in zip(zone_load_labels, zone_capacities, strict=True):
+        safe_label = label.lower().replace("-", "_")
+        load = model.NewIntVar(0, capacity, f"zone_load_{safe_label}")
+        model.Add(
+            load
+            == sum(
+                x[i, bed]
+                for i in range(n)
+                for bed in beds_by_zone[label]
+            )
+        )
+        normalized = model.NewIntVar(0, balance_scale, f"zone_util_{safe_label}")
+        model.Add(normalized == load * (balance_scale // capacity))
+        zone_load_vars.append(load)
+        normalized_zone_loads.append(normalized)
 
-    # Minimize the maximum deviation from the mean load
-    max_dev = model.NewIntVar(0, n_beds, "max_dev")
-    avg_target = n_beds // 4
-    for zl in zone_load_vars:
-        dev = model.NewIntVar(0, n_beds, f"dev_{z}")
-        model.Add(dev >= zl - avg_target)
-        model.Add(dev >= avg_target - zl)
-        model.Add(max_dev >= dev)
+    max_zone_load = model.NewIntVar(0, balance_scale, "max_zone_util")
+    min_zone_load = model.NewIntVar(0, balance_scale, "min_zone_util")
+    model.AddMaxEquality(max_zone_load, normalized_zone_loads)
+    model.AddMinEquality(min_zone_load, normalized_zone_loads)
+    max_dev = model.NewIntVar(0, balance_scale, "zone_utilization_gap")
+    model.Add(max_dev == max_zone_load - min_zone_load)
 
     # f₄: zone mismatch penalty — penalize assigning patient to non-preferred zone
     #      Isolation patients in ISO beds are always a match (no penalty)
@@ -408,9 +446,10 @@ def run_assignment(
     # Combined objective
     objective_bounds = {
         "occupancy": max(1, n_beds),
+        "high_risk": max(1, len(high_risk_indices)),
         "wait": max(1, n_beds * max(weights, default=1)),
         "overload": max(1, n_beds * max(sofa_vals, default=1)),
-        "balance": max(1, n_beds),
+        "balance": max(1, balance_scale),
         "zone_mismatch": max(1, n_beds),
         "move": max(1, n_beds),
     }
@@ -418,21 +457,31 @@ def run_assignment(
         name: _objective_coefficient(lam[name], objective_bounds[name])
         for name in lam
     }
-    model.Maximize(
-        objective_coefficients["occupancy"] * occupancy
-        + objective_coefficients["wait"] * f1
-        - objective_coefficients["overload"] * overload_penalty
-        - objective_coefficients["balance"] * max_dev
-        - objective_coefficients["zone_mismatch"] * zone_mismatch_penalty
-        - objective_coefficients["move"] * move_penalty
-    )
+    objective_specs = [
+        ObjectiveSpec("occupancy", occupancy, "max", objective_bounds["occupancy"]),
+        ObjectiveSpec("high_risk", high_risk_served, "max", objective_bounds["high_risk"]),
+        ObjectiveSpec("wait", f1, "max", objective_bounds["wait"]),
+        ObjectiveSpec("overload", overload_penalty, "min", objective_bounds["overload"]),
+        ObjectiveSpec("zone_mismatch", zone_mismatch_penalty, "min", objective_bounds["zone_mismatch"]),
+        ObjectiveSpec("move", move_penalty, "min", objective_bounds["move"]),
+        ObjectiveSpec("balance", max_dev, "min", objective_bounds["balance"]),
+    ]
 
     # ── 4. Solve ──────────────────────────────────────────────────
-    solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = float(
-        (opt.get("solver") or {}).get("max_time_seconds", 30.0)
+    multiobjective = solve_multiobjective(
+        model,
+        objective_specs,
+        mode=objective_mode,
+        weights=lam,
+        objective_order=objective_order,
+        epsilon_primary=epsilon_primary,
+        epsilon_bounds=epsilon_bounds,
+        max_time_seconds=float(
+            (opt.get("solver") or {}).get("max_time_seconds", 30.0)
+        ),
     )
-    status = solver.Solve(model)
+    solver = multiobjective.solver
+    status = multiobjective.status
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         raise RuntimeError(f"CP-SAT failed: status={status}")
 
@@ -508,6 +557,18 @@ def run_assignment(
         "n_stays": n,
         "solver_status": "OPTIMAL" if status == cp_model.OPTIMAL else "FEASIBLE",
         "lambda": lam,
+        "objective_mode": objective_mode,
+        "multiobjective": {
+            "primary": epsilon_primary if objective_mode == "epsilon_constraint" else None,
+            "epsilon_bounds": dict(epsilon_bounds or {}),
+            "order": list(objective_order or [spec.name for spec in objective_specs])
+            if objective_mode == "lexicographic"
+            else None,
+            "values": multiobjective.objective_values,
+            "stages": multiobjective.stages,
+            "exact_hierarchy": multiobjective.exact_hierarchy,
+            "wall_time_seconds": multiobjective.wall_time_seconds,
+        },
         "split": split,
         "split_meta": split_meta,
         "objective_scaling": {
@@ -516,12 +577,16 @@ def run_assignment(
         },
         "objective": {
             "f0_occupancy": assigned_count,
+            "f0b_high_risk_served": multiobjective.objective_values["high_risk"],
             "f1_priority_total": f1_val,
             "f2_overload_penalty": f2_val,
             "f3_balance_deviation": balance_dev,
             "f4_zone_mismatch": zone_mismatch_val,
             "f5_move_penalty": solver.Value(move_penalty),
             "zone_loads": zone_vals,
+            "zone_load_labels": zone_load_labels,
+            "zone_capacities": zone_capacities,
+            "balance_scale": balance_scale,
         },
         # These business metrics are independent of lambda coefficients, so
         # results from different tuning runs can be compared directly.
@@ -539,7 +604,7 @@ def run_assignment(
             "zone_match_rate": round(
                 n_zone_match / assigned_count, 4
             ) if assigned_count else 0.0,
-            "solve_time_seconds": round(solver.WallTime(), 4),
+            "solve_time_seconds": round(multiobjective.wall_time_seconds, 4),
             # ── business metrics (lambda-independent, clinical meaning) ──
             "unassigned": n - assigned_count,
             "high_risk_waiting": max(high_risk_total - high_risk_assigned, 0),

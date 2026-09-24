@@ -1,5 +1,7 @@
 lambda:
   # Written back from 256-combo calib + eval verification (docs/LAMBDA_TUNING.md, 2026-08-02)
+  # S2 explicit clinical-priority objective; 0.0 preserves the tuned legacy weighted baseline.
+  high_risk: 0.0
   wait: 0.5
   overload: 0.1
   balance: 0.1
