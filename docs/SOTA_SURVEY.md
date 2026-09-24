@@ -49,7 +49,15 @@
 |----|------|--------|--------|----------|
 | **H1** | 可配置约束规则 + 披露，比「隐式启发式」更可审计 | 黑盒分床或未披露伪随机需求 | `constraint_rules.yaml` + explain | 规则字段出现在解释报告；违反/利用率可复现 |
 | **H2** | 滚动仿真 + MIMIC 校准到达，优于固定随意 `admission_rate` 演示 | 固定费率 demo | `write_rolling_rates` / intensity | `simulate_ok`；利用率与入出转曲线可解释 |
-| **H3** | 在相同候选池上，CP-SAT / Greedy / PPO 三方对照可界定 RL 增益边界 | 仅展示 PPO 训练曲线 | `evaluate_ppo` + 轨迹协议 | 分配率、高危等待、约束相关指标对照表；**无协议不宣称 online** |
+| **H3** | 同候选池 CP-SAT / Greedy / PPO 对照可界定 RL 增益边界 | 仅展示 PPO 训练曲线 | `evaluate_ppo` + **S2-TRAJ** | 分配率、高危等待、约束指标；**无协议不宣称 online** |
+| **H4（采入）** | **S2-MOO**：同硬约束下三种多目标机理对照，优于「只调一组 λ」 | 单一加权和黑箱折中 | Weighted / Lex / ε-Constraint | 三模式状态/目标值/耗时可复现表；默认仍 `cp_sat` |
+
+### 已采入工程落点（2026-09-24）
+
+| 假设 | 落点 | 备注 |
+|------|------|------|
+| H4 | `domain/optimizer/multiobjective.py` · PR#10 | **正式创新波次**；≠ 轨迹协议 |
+| H3 | 对照表骨架已有 | 须 S2-TRAJ 闭合后才能强化 online 叙事 |
 
 ---
 

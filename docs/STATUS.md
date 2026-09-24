@@ -1,8 +1,8 @@
 # 项目状态
 
-> 更新：2026-09-24 · **独立调度深挖** · 滚动多目标 CP-SAT 主叙事 · PPO 为对照轨  
-> **叙事**：仓内 SOFA/GBDT 紧迫度；**不**读取 decision 风险分；轨迹协议齐备前不宣称 online MIMIC-PPO  
-> **组员包**：PR [#10](https://github.com/TinjiYDon/icu-scheduling-agent/pull/10) **S2-MOO** 已合 · 见 [TEAM_DIRECTION.md](TEAM_DIRECTION.md) / [S2_MULTI_OBJECTIVE.md](S2_MULTI_OBJECTIVE.md)
+> 更新：2026-09-24 · **独立调度** · 已采入 **S2-MOO（H4）** · 默认 CP-SAT  
+> **叙事**：仓内 SOFA/GBDT；**不**读 decision 风险分；**S2-TRAJ** 齐备前不宣称 online PPO  
+> 方向：[TEAM_DIRECTION.md](TEAM_DIRECTION.md) · 整合：[INTEGRATION_PREP.md](INTEGRATION_PREP.md) · [S2_MULTI_OBJECTIVE.md](S2_MULTI_OBJECTIVE.md)
 
 ## 数据
 
