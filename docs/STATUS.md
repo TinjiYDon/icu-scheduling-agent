@@ -49,7 +49,7 @@
 | Streamlit | `streamlit run presentation/streamlit_app.py` |
 | MLflow | `mlflow ui --backend-store-uri sqlite:///./mlflow.db` |
 | 说明 | [`TUNING_LOCAL.md`](TUNING_LOCAL.md) |
-| S2-MOO | ✅ PR#10 三模式 · **阶段 2**：`overload`=高危落普通床 SOFA；`wait`≡priority_served · 见 [`S2_MULTI_OBJECTIVE.md`](S2_MULTI_OBJECTIVE.md) |
+| S2-MOO | ✅ 阶段1–3 · A2 ε网格 calib：81点 / 可行54 / 非支配4 / HV=0.038794 · WS wait=57937 · Lex wait=58892 high_risk=12 · 见 [`S2_MULTI_OBJECTIVE.md`](S2_MULTI_OBJECTIVE.md) · `reports/moo/` |
 | S2-TRAJ | ✅ 协议 1.0 导出验收 · `export_trajectory --steps 4` + schema 单测 · 见 [`TRAJECTORY_PROTOCOL.md`](TRAJECTORY_PROTOCOL.md) |
 | PPO smoke | [`PPO_SMOKE.md`](PPO_SMOKE.md) · 代码在 main · **默认 cp_sat** · 离线轨迹≠ online |
 | 约束规则 | [`constraint_rules.yaml`](../configs/constraint_rules.yaml) · explain 披露启发式边界 |
