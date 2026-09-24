@@ -11,7 +11,7 @@
 | 定位 | **独立** 多目标多约束滚动床位调度 |
 | 禁止 | 读 decision `risk_score`；无轨迹宣称 online PPO |
 | 已采入 | **S2-MOO**（Weighted / Lex / ε） |
-| 勿混淆 | **S2-TRAJ**（轨迹协议）仍是下一 P0，**不**被 MOO 替代 |
+| 勿混淆 | **S2-TRAJ** 导出验收已过（2026-09-24）；下一 P0 = **MOO 阶段 2** |
 
 ## 验收命令
 
@@ -29,6 +29,6 @@ $env:PYTHONPATH = (Get-Location)
 ```text
 SSOT: docs/STATUS.md · docs/TEAM_DIRECTION.md · docs/S2_MULTI_OBJECTIVE.md
 adopted: S2-MOO = H4
-next: S2-TRAJ or MOO phase2 (pick one)
+next: MOO phase2 metric semantics (wait/overload)
 禁区: dumps/ · decision risk_score
 ```

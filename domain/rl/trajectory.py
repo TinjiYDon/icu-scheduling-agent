@@ -37,6 +37,8 @@ def _transition_from_history(history: list[dict], step_hours: int, n_beds: int) 
                 },
                 "reward_components": {
                     "occupancy": occupied / max(n_beds, 1),
+                    # wait ≈ free beds proxy（非真实等待时长；与 λ.wait 同构占位）
+                    "wait": float(free),
                     "wait_proxy": float(free),
                 },
                 "constraint_violation": False,

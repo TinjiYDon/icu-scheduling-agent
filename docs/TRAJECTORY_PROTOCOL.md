@@ -1,7 +1,7 @@
-# 轨迹协议 · ICU Scheduling RL（S2）
+# 轨迹协议 · ICU Scheduling RL（S2-TRAJ）
 
-> 更新：2026-09-13  
-> **未齐本协议前，禁止在 STATUS 宣称 online MIMIC-PPO 训练成功。**
+> 更新：2026-09-24 · **导出验收已过**（schema 单测 + `--steps 4` 真跑）  
+> **仍禁止**仅凭本包宣称 online MIMIC-PPO / 床旁临床 RL。
 
 ## 目的
 
@@ -34,9 +34,15 @@ $env:PYTHONPATH = (Get-Location)
 - RL 奖励权重优先读 `optimizer.yaml` → `rl.reward_weights`，缺省回退 `lambda.*`。
 - 本包来自 **rolling 仿真导出**，不是床旁 MIMIC 事件日志；可用于 offline 对照与 smoke，不能单独支撑「真实 online 临床 RL」话术。
 
-## 验收
+## 验收（2026-09-24 已过）
 
 ```powershell
 .\.venv\Scripts\python.exe -m application.export_trajectory --steps 4
 .\.venv\Scripts\python.exe -m pytest tests/test_trajectory_export.py -q
 ```
+
+| 检查 | 结果 |
+|------|------|
+| `protocol_version=1.0` 包字段 | ✅ 单测 `test_protocol_schema_on_synthetic_pack` |
+| 真跑 `--steps 4` → `n_transitions=4` | ✅ `artifacts/trajectories/rolling_traj_*.json`（不入 Git） |
+| 叙事边界 | ✅ notes 明示非 MIMIC 床旁日志；默认仍 `cp_sat` |

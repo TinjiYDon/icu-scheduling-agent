@@ -1,18 +1,18 @@
 # Roadmap · icu-scheduling-agent
 
-> 更新：2026-09-24（采入 S2-MOO 为正式创新波次）  
+> 更新：2026-09-24（S2-TRAJ 导出验收过；下一拍 MOO 阶段 2）  
 > 人读：多目标多约束滚动调度；默认 CP-SAT；不接 decision 风险分。  
-> AI：**S2-MOO** ≠ **S2-TRAJ**；无轨迹不宣称 online MIMIC-PPO。
+> AI：**S2-MOO** ≠ **S2-TRAJ**；有离线轨迹仍不宣称 online MIMIC-PPO。
 
 ## Agent 上下文
 
 ```text
 repo: icu-scheduling-agent
-adopted: S2-MOO weighted/lex/epsilon
-vnext_p0: S2-TRAJ trajectory export acceptance; S2-MOO phase2 metric semantics (pick one focus)
+adopted: S2-MOO weighted/lex/epsilon; S2-TRAJ export accepted
+vnext_p0: S2-MOO phase2 metric semantics (wait/overload)
 vnext_p1: payoff/Pareto grid; calib scenario pack → STATUS
 vnext_p2: Streamlit three-mode UI; S3 RL compare on same pool
-forbidden: decision risk_score; claim online PPO without trajectories
+forbidden: decision risk_score; claim online PPO from offline traj alone
 ```
 
 ## 原则
@@ -30,13 +30,13 @@ forbidden: decision risk_score; claim online PPO without trajectories
 | S0–S1 | 约束诚实化 + 到达强度骨架 | ✅ PR#8 等 | H1 / H2 |
 | **S2-MOO** | 同硬约束下 Weighted / Lex / ε-Constraint | ✅ PR#10 | 多目标方法对照（升格） |
 | H3 对照表骨架 | CP-SAT / Greedy / PPO 表 | ✅ 部分 | H3 |
+| **S2-TRAJ** | 滚动仿真轨迹协议 1.0 导出验收 | ✅ 2026-09-24 | H3 前置 |
 
 ## 下一阶段计划
 
 | 优先级 | 项 | 说明 |
 |--------|----|------|
-| **P0** | **S2-TRAJ** | 轨迹导出验收（旧 ROADMAP「S2」）；与 MOO **并行不互相替代** |
-| **P0** | S2-MOO 阶段 2 | 真实 wait / overload 床日语义（见 [S2_MULTI_OBJECTIVE.md](S2_MULTI_OBJECTIVE.md)）— **与 TRAJ 二选一做透后再并行** |
+| **P0** | S2-MOO 阶段 2 | 真实 wait / overload 床日语义（见 [S2_MULTI_OBJECTIVE.md](S2_MULTI_OBJECTIVE.md)） |
 | **P1** | payoff / ε 网格 | 阶段 3 Pareto 扫描 |
 | **P1** | calib 场景包 | 写入 STATUS 对照表 |
 | **P2** | Streamlit 三模式 | 展示 MOO 结果 |
