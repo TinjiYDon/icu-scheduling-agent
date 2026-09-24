@@ -1,6 +1,6 @@
 # 项目状态
 
-> 更新：2026-09-24 · **独立调度** · **S2-MOO（H4）** + 阶段2语义 + **S2-TRAJ** · 默认 CP-SAT  
+> 更新：2026-09-24 · **独立调度** · **S2-MOO 阶段1–3** + **S2-TRAJ** · 默认 CP-SAT  
 > **叙事**：仓内 SOFA/GBDT；**不**读 decision 风险分；有轨迹包仍**不**宣称 online MIMIC-PPO  
 > 方向：[TEAM_DIRECTION.md](TEAM_DIRECTION.md) · 整合：[INTEGRATION_PREP.md](INTEGRATION_PREP.md) · [S2_MULTI_OBJECTIVE.md](S2_MULTI_OBJECTIVE.md)
 
