@@ -1,8 +1,9 @@
 # Roadmap · icu-scheduling-agent
 
-> 更新：2026-09-13  
+> 更新：2026-09-24  
 > 人读：本仓独立出成果——多目标多约束滚动调度 + 深化 RL；不接 decision 风险分。  
-> AI：禁止实现「读取 decision 风险分」；轨迹协议齐备前勿宣称 online MIMIC-PPO。
+> AI：禁止实现「读取 decision 风险分」；轨迹协议齐备前勿宣称 online MIMIC-PPO。  
+> **2026-09-24**：组员 **S2-MOO** PR#10 已合；与旧「S2 轨迹协议」不同名，见 [TEAM_DIRECTION.md](TEAM_DIRECTION.md)。
 
 ## Agent 上下文
 
@@ -29,8 +30,9 @@ independent: zero hard couple; own dump/acceptance/release
 |------|----|------|
 | **S-LIT** | 文献/市面对标 | [SOTA_SURVEY.md](SOTA_SURVEY.md) · 假设 H1–H3 |
 | S0 | 文档诚实化 | ISO/vent 求解边界；λ 与 `optimizer.yaml` 一致 |
-| S1 | 多目标多约束加深 | 可配置规则 + 违反报告；滚动到达强度写回 |
-| S2 | 轨迹协议 | rolling 导出 → `artifacts/trajectories/` |
+| S1 | 多目标多约束加深 | 可配置规则 + 到达强度（骨架已合） |
+| **S2-MOO** | 多目标求解模式 | **已合 PR#10** · weighted / lex / ε |
+| S2 | 轨迹协议 | rolling 导出 → `artifacts/trajectories/`（**下一阶段 P0**） |
 | S3 | 多目标约束 RL | `rl.reward_weights`；三方对照验收 |
 | **S-FLY** | 数据飞轮 | [DATA_FLYWHEEL.md](DATA_FLYWHEEL.md) · `reports/flywheel/` |
 ## 纠正
