@@ -153,6 +153,7 @@ def run_assignment(
     epsilon_primary: str = "wait",
     epsilon_bounds: Mapping[str, int | float] | None = None,
     max_time_seconds: float | None = None,
+    resource_overrides: Mapping[str, object] | None = None,
 ) -> dict:
     """Run CP-SAT bed assignment.
 
@@ -173,12 +174,15 @@ def run_assignment(
         epsilon_primary: objective optimized by epsilon-constraint mode.
         epsilon_bounds: direction-aware bounds for all non-primary objectives.
         max_time_seconds: optional CP-SAT wall-time override (phase-3 grids).
+        resource_overrides: optional patch for ``resources.*`` (phase-4 scenarios).
     """
     if split is not None and split not in ("calib", "eval"):
         raise ValueError("split must be 'calib', 'eval' or None")
     opt = load_yaml("optimizer.yaml")
     lam = _resolve_lambda_weights(opt.get("lambda", {}), lambda_weights)
     resources = dict(opt.get("resources") or {})
+    if resource_overrides:
+        resources.update(dict(resource_overrides))
     n_beds = int(resources.get("n_beds", 20))
     solver_time = float(
         max_time_seconds

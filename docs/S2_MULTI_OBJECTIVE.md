@@ -1,6 +1,6 @@
 # S2-MOO：多目标求解方法对照
 
-> 状态：阶段 1 ✅ · 阶段 2 ✅ · **阶段 3 ✅（2026-09-24 · A2 网格）** · 下一拍阶段 4（六场景）
+> 状态：阶段 1–4 ✅（2026-09-29 · 六场景轻量对照）· 下一拍阶段 5（Streamlit）
 >
 > 范围：同一 ICU 候选池、床位资源和硬约束下，对比 Weighted Sum、Lexicographic 与 ε-Constraint。
 >
@@ -85,7 +85,7 @@ balance <= ε_balance
 | 1 ✅ | 统一目标规格；三种求解模式；阶段状态与累计时间 | 玩具模型单测 + 真实 MIMIC 只读求解 |
 | 2 ✅ | 目标语义：`wait`→priority_served 披露；`overload`→高危落普通床；balance 区标准化 | `tests/test_objective_semantics.py`；旧 λ 键兼容 |
 | 3 ✅ | payoff table、ε 网格（A2）、非支配解与 hypervolume | `python -m application.run_moo_phase3` → `reports/moo/`；`tests/test_moo_phase3.py` |
-| 4 | 六场景对照与 calib/eval 报告 | 相同实例、相同时间预算、统一结果表 |
+| 4 ✅ | 六场景对照（WS+Lex+ε mid） | `python -m application.run_moo_phase4`；`tests/test_moo_scenarios.py` |
 | 5 | Streamlit 展示与论文表格 | 方法、Pareto 与敏感性图可解释 |
 
 ## 实验场景
@@ -98,6 +98,28 @@ balance <= ε_balance
 6. 科室需求不均衡。
 
 每个场景固定患者集合、床位资源、随机种子、硬约束和总求解时间。报告原始目标值、分配率、高危等待、错区率、资源利用率、状态、累计时间与最优性信息。
+
+## 阶段 4 入口（轻量六场景）
+
+```powershell
+$env:PYTHONPATH = (Get-Location)
+.\.venv\Scripts\python.exe -m application.run_moo_phase4 --split calib --max-time 30
+```
+
+每场景：Weighted Sum + Lexicographic + 1×ε（中位界）。产出：`reports/moo/scenarios_latest.json`（不入 Git）。
+
+## 阶段 4 验收记录（2026-09-29 · calib）
+
+| 场景 | WS assigned / wait / high_risk | Lex assigned / wait / high_risk | ε mid |
+|------|-------------------------------:|--------------------------------:|-------|
+| S1 正常容量 | 20 / 57937 / 4 | 20 / 58892 / 12 | OPTIMAL |
+| S2 总床位不足 | 12 / 34573 / 2 | 12 / 35494 / 7 | OPTIMAL |
+| S3 隔离床不足 | 20 / 56759 / 1 | 20 / 57714 / 9 | 不可行（中位ε过紧） |
+| S4 呼吸机不足 | 20 / 57649 / 4 | 20 / 58120 / 6 | OPTIMAL |
+| S5 高 SOFA 集中 | 10 / 28955 / 10 | 10 / 28955 / 10 | 不可行 |
+| S6 科室不均 | 4 / 11385 / 1 | 4 / 10811 / 2 | 不可行 |
+
+> WS/Lex 六场景均 OPTIMAL；部分压力场景下固定中位 ε 不可行属预期，不强制宣称全网格可行。
 
 ## 阶段 3 入口（A2）
 

@@ -1,6 +1,6 @@
 # 项目状态
 
-> 更新：2026-09-24 · **独立调度** · **S2-MOO 阶段1–3** + **S2-TRAJ** · 默认 CP-SAT  
+> 更新：2026-09-29 · **独立调度** · **S2-MOO 阶段1–4** + **S2-TRAJ** · 默认 CP-SAT  
 > **叙事**：仓内 SOFA/GBDT；**不**读 decision 风险分；有轨迹包仍**不**宣称 online MIMIC-PPO  
 > 方向：[TEAM_DIRECTION.md](TEAM_DIRECTION.md) · 整合：[INTEGRATION_PREP.md](INTEGRATION_PREP.md) · [S2_MULTI_OBJECTIVE.md](S2_MULTI_OBJECTIVE.md)
 
@@ -49,13 +49,26 @@
 | Streamlit | `streamlit run presentation/streamlit_app.py` |
 | MLflow | `mlflow ui --backend-store-uri sqlite:///./mlflow.db` |
 | 说明 | [`TUNING_LOCAL.md`](TUNING_LOCAL.md) |
-| S2-MOO | ✅ 阶段1–3 · A2 ε网格 calib：81点 / 可行54 / 非支配4 / HV=0.038794 · WS wait=57937 · Lex wait=58892 high_risk=12 · 见 [`S2_MULTI_OBJECTIVE.md`](S2_MULTI_OBJECTIVE.md) · `reports/moo/` |
+| S2-MOO | ✅ 阶段1–4 · 六场景 WS/Lex 均 OPTIMAL · 见下表 · [`S2_MULTI_OBJECTIVE.md`](S2_MULTI_OBJECTIVE.md) · `reports/moo/` |
 | S2-TRAJ | ✅ 协议 1.0 导出验收 · `export_trajectory --steps 4` + schema 单测 · 见 [`TRAJECTORY_PROTOCOL.md`](TRAJECTORY_PROTOCOL.md) |
 | PPO smoke | [`PPO_SMOKE.md`](PPO_SMOKE.md) · 代码在 main · **默认 cp_sat** · 离线轨迹≠ online |
 | 约束规则 | [`constraint_rules.yaml`](../configs/constraint_rules.yaml) · explain 披露启发式边界 |
 | RL 权重 | `optimizer.yaml` → `rl.reward_weights`（与 λ 解耦，含 occupancy） |
 | SOTA 对标 | [`SOTA_SURVEY.md`](SOTA_SURVEY.md) · 假设 H1–H3 |
 | 数据飞轮 | [`DATA_FLYWHEEL.md`](DATA_FLYWHEEL.md) · `reports/flywheel/`（simulate / evaluate_ppo 自动归档） |
+
+## S2-MOO 阶段 4 六场景（calib · 2026-09-29 · 轻量）
+
+| 场景 | WS a/wait/hr | Lex a/wait/hr | ε mid |
+|------|-------------:|--------------:|-------|
+| S1 正常 | 20/57937/4 | 20/58892/12 | OK |
+| S2 床不足 | 12/34573/2 | 12/35494/7 | OK |
+| S3 隔离不足 | 20/56759/1 | 20/57714/9 | 不可行 |
+| S4 呼吸机不足 | 20/57649/4 | 20/58120/6 | OK |
+| S5 高SOFA | 10/28955/10 | 10/28955/10 | 不可行 |
+| S6 科室不均 | 4/11385/1 | 4/10811/2 | 不可行 |
+
+验收：`python -m application.run_moo_phase4 --split calib`
 
 ## S2-MOO 阶段 3 摘要（calib · 2026-09-24）
 

@@ -15,8 +15,8 @@
 | ✅ | **S2-TRAJ** 轨迹导出验收 | 2026-09-24 已过；仍禁虚假 online 宣称 |
 | ✅ | MOO 阶段 2 指标语义 | acuity `overload` + `priority_served` 披露 |
 | ✅ | MOO 阶段 3 ε 网格 / payoff | A2 calib：81/54/4 · HV=0.038794 |
-| P0 | MOO 阶段 4 六场景 | 统一对照表 |
-| P2 | Streamlit 三模式 | 展示先进性 |
+| ✅ | MOO 阶段 4 六场景 | 轻量 WS+Lex+ε；WS/Lex 全 OPTIMAL |
+| P0 | MOO 阶段 5 Streamlit | 展示先进性 |
 
 ## 已关闭
 
