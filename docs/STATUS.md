@@ -1,6 +1,6 @@
 # 项目状态
 
-> 更新：2026-09-29 · **独立调度** · **S2-MOO 阶段1–4** + **S2-TRAJ** · 默认 CP-SAT  
+> 更新：2026-09-29 · **独立调度** · **S2-MOO 阶段1–5（三模式 UI）** + **S2-TRAJ** · 默认 CP-SAT  
 > **叙事**：仓内 SOFA/GBDT；**不**读 decision 风险分；有轨迹包仍**不**宣称 online MIMIC-PPO  
 > 方向：[TEAM_DIRECTION.md](TEAM_DIRECTION.md) · 整合：[INTEGRATION_PREP.md](INTEGRATION_PREP.md) · [S2_MULTI_OBJECTIVE.md](S2_MULTI_OBJECTIVE.md)
 
@@ -11,7 +11,7 @@
 | Layer0 labevents | ✅ 158,374,764 |
 | feat.sofa_timeseries | ✅ 94,458（真实 SOFA · 0~12 · avg 4.74）|
 | dump | ✅ `dumps/icu_scheduling_P0-full_mimic_94458stays_20260802.dump` · 见 [`DUMP_READY.md`](DUMP_READY.md) |
-| 交互台 | ✅ **Plotly Ops 台 v4** 项目/运行/验收 · `.\scripts\run_console.ps1` |
+| 交互台 | ✅ **Plotly Ops 台** · 导航含 **多目标** / **对照(H3)** · `.\scripts\run_console.ps1` |
 | 下一步 | [`TOP_TIER_NEXT.md`](TOP_TIER_NEXT.md) |
 | 交付说明 | [`DUMP_READY.md`](DUMP_READY.md) |
 | simulate | ✅ OPTIMAL · **n_candidates=1000** · assigned=20 |
@@ -49,13 +49,31 @@
 | Streamlit | `streamlit run presentation/streamlit_app.py` |
 | MLflow | `mlflow ui --backend-store-uri sqlite:///./mlflow.db` |
 | 说明 | [`TUNING_LOCAL.md`](TUNING_LOCAL.md) |
-| S2-MOO | ✅ 阶段1–4 · 六场景 WS/Lex 均 OPTIMAL · 见下表 · [`S2_MULTI_OBJECTIVE.md`](S2_MULTI_OBJECTIVE.md) · `reports/moo/` |
+| S2-MOO | ✅ 阶段1–4 实验 + **阶段5 Streamlit「多目标」页** · 六场景 WS/Lex 均 OPTIMAL · 见下表 · [`S2_MULTI_OBJECTIVE.md`](S2_MULTI_OBJECTIVE.md) · [`TEACHER_INNOVATION.md`](TEACHER_INNOVATION.md) · `reports/moo/` |
 | S2-TRAJ | ✅ 协议 1.0 导出验收 · `export_trajectory --steps 4` + schema 单测 · 见 [`TRAJECTORY_PROTOCOL.md`](TRAJECTORY_PROTOCOL.md) |
 | PPO smoke | [`PPO_SMOKE.md`](PPO_SMOKE.md) · 代码在 main · **默认 cp_sat** · 离线轨迹≠ online |
+| H3 对照表 | ✅ **Fair 同池**：20 stays × 20 beds · PPO/贪心/CP-SAT assigned 均为 **4**（rate=0.20）· `python -m application.compare_policies` · Streamlit「对照」 |
+| 优先级消融 | ✅ SOFA-only vs 公式 vs GBDT · `python -m application.compare_priority` → `reports/priority_ablation.json` · Spearman(formula,GBDT)≈0.999 · top50 与 SOFA-only 重叠 0.24 |
 | 约束规则 | [`constraint_rules.yaml`](../configs/constraint_rules.yaml) · explain 披露启发式边界 |
 | RL 权重 | `optimizer.yaml` → `rl.reward_weights`（与 λ 解耦，含 occupancy） |
 | SOTA 对标 | [`SOTA_SURVEY.md`](SOTA_SURVEY.md) · 假设 H1–H3 |
 | 数据飞轮 | [`DATA_FLYWHEEL.md`](DATA_FLYWHEEL.md) · `reports/flywheel/`（simulate / evaluate_ppo 自动归档） |
+
+## S2-MOO 阶段 4 六场景（eval · 2026-09-29 · ε 按场景重标定）
+
+> `python -m application.run_moo_phase4 --split eval --max-time 20`  
+> 本地 `reports/moo/scenarios_latest.json`（不入库）· `epsilon_recal=true`
+
+| 场景 | WS a/wait/hr | Lex a/wait/hr | ε mid |
+|------|-------------:|--------------:|-------|
+| S1 正常 | 18/51308/2 | 18/52199/9 | OPTIMAL |
+| S2 床不足 | 12/34648/3 | 12/35106/6 | OPTIMAL |
+| S3 隔离不足 | 15/42632/2 | 15/43523/9 | OPTIMAL |
+| S4 呼吸机不足 | 12/34436/2 | 12/34626/3 | OPTIMAL |
+| S5 高SOFA | 7/20688/7 | 7/20688/7 | OPTIMAL |
+| S6 科室不均 | 4/11013/0 | 4/10780/1 | OPTIMAL |
+
+WS / Lex / ε mid **六场景均可解**（重标定后）。
 
 ## S2-MOO 阶段 4 六场景（calib · 2026-09-29 · 轻量）
 

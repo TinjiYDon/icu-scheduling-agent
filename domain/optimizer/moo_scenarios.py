@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
+from domain.optimizer.moo_epsilon_recal import DEFAULT_EPSILON_BOUNDS as RECAL_DEFAULT_EPS
+from domain.optimizer.moo_epsilon_recal import scenario_epsilon_bounds
 from domain.optimizer.moo_phase3 import DEFAULT_OBJECTIVES, OBJECTIVE_SENSES
 from domain.optimizer.resources import scale_bed_layout
 
@@ -20,12 +22,7 @@ ROOT = Path(__file__).resolve().parents[2]
 REPORT_DIR = ROOT / "reports" / "moo"
 
 # Mid-grid epsilon from phase-3 A2 payoff (loose–tight midpoint-ish).
-DEFAULT_EPSILON_BOUNDS: dict[str, int] = {
-    "occupancy": 10,
-    "high_risk": 6,
-    "overload": 42,
-    "balance": 2,
-}
+DEFAULT_EPSILON_BOUNDS: dict[str, int] = dict(RECAL_DEFAULT_EPS)
 
 
 @dataclass(frozen=True)
@@ -204,16 +201,23 @@ def run_all_scenarios(
             stay_ids = resolve_pool(spec, split)
         if progress:
             progress(spec.id, "start")
+        per_eps = (
+            dict(epsilon_bounds)
+            if epsilon_bounds is not None
+            else scenario_epsilon_bounds(spec)
+        )
         rows = run_scenario_pack(
             solve,
             scenario=spec,
             split=split,
             persist=persist,
             max_time_seconds=max_time_seconds,
-            epsilon_bounds=epsilon_bounds,
+            epsilon_bounds=per_eps,
             stay_ids=stay_ids,
             include_epsilon=include_epsilon,
         )
+        for row in rows:
+            row["epsilon_bounds_used"] = dict(per_eps)
         all_rows.extend(rows)
         if progress:
             progress(spec.id, "done")
@@ -222,7 +226,8 @@ def run_all_scenarios(
         "created_at": datetime.now(timezone.utc).isoformat(),
         "split": split,
         "max_time_seconds": max_time_seconds,
-        "epsilon_bounds": dict(epsilon_bounds or DEFAULT_EPSILON_BOUNDS),
+        "epsilon_bounds": dict(epsilon_bounds) if epsilon_bounds is not None else "per_scenario",
+        "epsilon_recal": True,
         "objective_senses": dict(OBJECTIVE_SENSES),
         "scenarios": [
             {
