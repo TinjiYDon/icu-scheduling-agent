@@ -21,6 +21,7 @@
 | ✅ | MOO 阶段 5 Streamlit | PR #11「多目标」+「对照」 |
 | ✅ | H3 资源布局对齐 follow-up | PR #12 |
 | ✅ | S3 同池多 episode 深化 | fair benchmark + 对照页 Tab |
+| ✅ | 老师演示清单 | `DEMO_SCRIPT.md` 对齐多目标/对照 |
 
 ## 已关闭
 

@@ -1,6 +1,7 @@
 # 给老师的创新口径 · icu-scheduling-agent
 
-> 2026-09-29 · 与桌面汇报 PPT 对齐 · 不宣称 online PPO
+> 2026-10-09 · 与桌面汇报 PPT 对齐 · 不宣称 online PPO  
+> **口播脚本**：[DEMO_SCRIPT.md](DEMO_SCRIPT.md)（5–7 分钟 · 含多目标/对照页）
 
 ## 一句话
 
@@ -23,6 +24,8 @@
 | 优先级消融 | 只用 SOFA 或只信 GBDT | SOFA-only vs 公式 vs GBDT · Spearman / top-k | `reports/priority_ablation.json` |
 
 ## 演示台
+
+按 [DEMO_SCRIPT.md](DEMO_SCRIPT.md) 顺序点导航：**项目 → 运行 → 多目标 → 对照 → 验收**。
 
 Streamlit：**多目标**页（含当场 ε）· **对照**页（H3 单次 + 多 episode 深化）。  
 `python -m application.compare_policies` → `reports/policy_comparison.json`  

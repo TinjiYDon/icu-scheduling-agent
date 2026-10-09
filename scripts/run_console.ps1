@@ -22,5 +22,6 @@ Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinu
 Start-Sleep -Seconds 1
 
 Write-Host "Starting scheduling console at http://localhost:$Port"
+Write-Host "Nav: 项目 → 运行 → 多目标 → 对照 → 验收  (see docs/DEMO_SCRIPT.md)"
 Write-Host "Using: $py"
 & $py -m streamlit run (Join-Path $root "presentation\streamlit_app.py") --server.port $Port --server.headless true

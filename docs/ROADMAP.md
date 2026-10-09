@@ -1,6 +1,6 @@
 # Roadmap · icu-scheduling-agent
 
-> 更新：2026-10-09（S3 多 episode fair benchmark 深化）  
+> 更新：2026-10-09（老师演示清单 DEMO_SCRIPT 已对齐多目标/对照）  
 > 人读：多目标多约束滚动调度；默认 CP-SAT；不接 decision 风险分。  
 > AI：**S2-MOO** ≠ **S2-TRAJ**；有离线轨迹仍不宣称 online MIMIC-PPO。
 
@@ -8,9 +8,9 @@
 
 ```text
 repo: icu-scheduling-agent
-adopted: S2-MOO p1-p5; S2-TRAJ; fair H3 + same resources; S3 multi-ep benchmark; L4
-vnext_p0: teacher demo checklist on 多目标/对照 pages
-vnext_p1: optional PPO zip offline smoke when artifacts present
+adopted: S2-MOO p1-p5; S2-TRAJ; fair H3; S3 multi-ep; teacher DEMO_SCRIPT; L4
+vnext_p0: optional PPO zip offline smoke when artifacts present
+vnext_p1: keep STATUS numbers fresh after local moo/ppo runs
 forbidden: decision risk_score; claim online PPO from offline traj alone
 ```
 
@@ -35,14 +35,15 @@ forbidden: decision risk_score; claim online PPO from offline traj alone
 | **S2-MOO 阶段 4** | 六场景轻量对照 | ✅ 2026-09-29 | H4 |
 | **S2-MOO 阶段 5** | Streamlit 三模式 + 对照页 | ✅ PR #11 | H4 / H3 |
 | **H3 fair+L4** | 同资源布局 · `moo_ui`/`h3_ui` · restore 重建 | ✅ PR #12 | H3 |
-| **S3 deepen** | 多 episode 同池+同资源 benchmark + 对照页 | ✅ 本拍 | H3 |
+| **S3 deepen** | 多 episode 同池+同资源 benchmark + 对照页 | ✅ PR #14 | H3 |
+| **演示清单** | DEMO_SCRIPT 含多目标/对照口播 | ✅ 2026-10-09 | — |
 
 ## 下一阶段计划
 
 | 优先级 | 项 | 说明 |
 |--------|----|------|
-| **P1** | 老师演示清单 | 多目标 / 对照页一口令脚本 |
-| **P2** | PPO zip 真跑冒烟 | 有 `artifacts/ppo_icu` 时点验（不入 Git） |
+| **P1** | PPO zip 真跑冒烟 | 有 `artifacts/ppo_icu` 时点验（不入 Git） |
+| **P2** | STATUS 数字保鲜 | 本地 moo/ppo 跑完回写摘要表 |
 
 ## 纠正
 
