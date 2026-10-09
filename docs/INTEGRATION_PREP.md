@@ -28,7 +28,7 @@
 | C4 | Streamlit 三模式 UI | ✅ PR #11 |
 | C5 | MOO 阶段 4 六场景 | ✅ 2026-09-29 |
 | C6 | Streamlit 三模式 UI | ✅ 与 C4 合并（PR #11） |
-| C7 | H3 同资源布局 + L4 封装 | 本地 follow-up（`h3_ui` / `moo_ui`） |
+| C7 | H3 同资源布局 + L4 封装 | ✅ PR #12（`h3_ui` / `moo_ui`） |
 
 ## 禁区
 

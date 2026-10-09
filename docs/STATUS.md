@@ -1,6 +1,6 @@
 # 项目状态
 
-> 更新：2026-09-29 · **独立调度** · **S2-MOO 阶段1–5（三模式 UI）** + **S2-TRAJ** · 默认 CP-SAT  
+> 更新：2026-10-09 · **独立调度** · **S2-MOO 1–5** + Fair H3（PR #11/#12）+ **S2-TRAJ** · 默认 CP-SAT  
 > **叙事**：仓内 SOFA/GBDT；**不**读 decision 风险分；有轨迹包仍**不**宣称 online MIMIC-PPO  
 > 方向：[TEAM_DIRECTION.md](TEAM_DIRECTION.md) · 整合：[INTEGRATION_PREP.md](INTEGRATION_PREP.md) · [S2_MULTI_OBJECTIVE.md](S2_MULTI_OBJECTIVE.md)
 
@@ -52,7 +52,7 @@
 | S2-MOO | ✅ 阶段1–4 实验 + **阶段5 Streamlit「多目标」页** · 六场景 WS/Lex 均 OPTIMAL · 见下表 · [`S2_MULTI_OBJECTIVE.md`](S2_MULTI_OBJECTIVE.md) · [`TEACHER_INNOVATION.md`](TEACHER_INNOVATION.md) · `reports/moo/` |
 | S2-TRAJ | ✅ 协议 1.0 导出验收 · `export_trajectory --steps 4` + schema 单测 · 见 [`TRAJECTORY_PROTOCOL.md`](TRAJECTORY_PROTOCOL.md) |
 | PPO smoke | [`PPO_SMOKE.md`](PPO_SMOKE.md) · 代码在 main · **默认 cp_sat** · 离线轨迹≠ online |
-| H3 对照表 | ✅ **Fair 同池**：20 stays × 20 beds · PPO/贪心/CP-SAT assigned 均为 **4**（rate=0.20）· `python -m application.compare_policies` · Streamlit「对照」 |
+| H3 对照表 | ✅ **Fair 同池+同资源**：stay_ids + beds + isolation/vent/zones · PPO/贪心/CP-SAT assigned 均为 **4**（rate=0.20）· L4 `application.h3_ui` · Streamlit「对照」 |
 | 优先级消融 | ✅ SOFA-only vs 公式 vs GBDT · `python -m application.compare_priority` → `reports/priority_ablation.json` · Spearman(formula,GBDT)≈0.999 · top50 与 SOFA-only 重叠 0.24 |
 | 约束规则 | [`constraint_rules.yaml`](../configs/constraint_rules.yaml) · explain 披露启发式边界 |
 | RL 权重 | `optimizer.yaml` → `rl.reward_weights`（与 λ 解耦，含 occupancy） |
@@ -87,6 +87,18 @@ WS / Lex / ε mid **六场景均可解**（重标定后）。
 | S6 科室不均 | 4/11385/1 | 4/10811/2 | 不可行 |
 
 验收：`python -m application.run_moo_phase4 --split calib`
+
+## S2-MOO 轻量三模式（calib · 2026-10-09 · restore 后冒烟）
+
+> `application.moo_ui.run_three_mode_live(split="calib", max_time_seconds=30)` · Layer1 stays/sofa=94458
+
+| 方法 | 状态 | assigned | wait | high_risk | overload | 耗时 |
+|------|------|---------:|-----:|----------:|---------:|-----:|
+| Weighted Sum | OPTIMAL | 20 | 40300 | 10 | 65 | 2.3s |
+| Lexicographic | OPTIMAL | 20 | 41900 | 17 | 144 | 13.5s |
+| ε mid | OPTIMAL | 18 | 36000 | 8 | 42 | 1.6s |
+
+> 数值随候选截断/求解时限波动；口径为「三种机理均可复现 OPTIMAL」，不宣称某一全局最优。
 
 ## S2-MOO 阶段 3 摘要（calib · 2026-09-24）
 

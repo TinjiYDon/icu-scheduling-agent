@@ -8,6 +8,7 @@
 |----|------|
 | [#10](https://github.com/TinjiYDon/icu-scheduling-agent/pull/10) | **S2-MOO（H4）** 三种多目标机理 |
 | [#11](https://github.com/TinjiYDon/icu-scheduling-agent/pull/11) | Fair H3 + 阶段 5 UI + ε 重标定 + CI test_plan |
+| [#12](https://github.com/TinjiYDon/icu-scheduling-agent/pull/12) | H3 同资源布局 + L4 `moo_ui`/`h3_ui` + restore recreate |
 
 ## 合入优先序（下一拍）
 
@@ -18,7 +19,8 @@
 | ✅ | MOO 阶段 3 ε 网格 / payoff | A2 calib：81/54/4 · HV=0.038794 |
 | ✅ | MOO 阶段 4 六场景 | 轻量 WS+Lex+ε；WS/Lex 全 OPTIMAL |
 | ✅ | MOO 阶段 5 Streamlit | PR #11「多目标」+「对照」 |
-| P1 | H3 资源布局对齐 follow-up | CP-SAT 用 PPO env 隔离/呼吸机/分区（本地未推） |
+| ✅ | H3 资源布局对齐 follow-up | PR #12 |
+| P1 | S3 同池 RL 对照深化 | 离线；不宣称 online MIMIC-PPO |
 
 ## 已关闭
 
