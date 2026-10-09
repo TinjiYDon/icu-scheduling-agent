@@ -28,6 +28,7 @@
 | **H5 PtO** | 相关性≠决策 | 同池换紧迫度 → 分床 Jaccard/指标 | `run_pto_ablation` |
 | **H6 滚动** | 「滚动只是仿真壳」 | 再优化 vs 贪心填床 | `run_rolling_contrast` |
 | 价值判断 | 够不够学术 | 诚实够格表 | [`ACADEMIC_VALUE.md`](ACADEMIC_VALUE.md) |
+| 新旧对比+公式 | 「和以前比多了啥」 | 对照表 + \(x_{ib}\) / Lex / ε / Jaccard | [`REPORT_SPEECH.md`](REPORT_SPEECH.md) · [`MODEL_FORMULAS.md`](MODEL_FORMULAS.md) |
 
 ## 演示台
 

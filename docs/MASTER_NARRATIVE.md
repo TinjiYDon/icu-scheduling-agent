@@ -109,6 +109,8 @@ flowchart LR
 | 多目标细节 | [S2_MULTI_OBJECTIVE.md](S2_MULTI_OBJECTIVE.md) | `run_moo_phase3/4` |
 | 数据 / restore | [DUMP_READY.md](DUMP_READY.md) | restore 脚本 |
 | 老师创新口径 | [TEACHER_INNOVATION.md](TEACHER_INNOVATION.md) | DEMO |
+| 报告词（含新旧对比） | [REPORT_SPEECH.md](REPORT_SPEECH.md) | 答辩口述 |
+| 模型与公式 | [MODEL_FORMULAS.md](MODEL_FORMULAS.md) | 板书 / 附录 |
 | Agent 契约 | 根目录 `AGENTS.md` | pytest 白名单 |
 
 **关键命令（顺着链）：**
