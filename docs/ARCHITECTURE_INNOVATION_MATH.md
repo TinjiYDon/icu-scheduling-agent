@@ -2,7 +2,7 @@
 
 > 展示用 SSOT · 2026-10-09  
 > 配置真值来自 `configs/optimizer.yaml` · 公式与代码一致  
-> 报告口播：[REPORT_SPEECH_COMPLETE.md](REPORT_SPEECH_COMPLETE.md) · H7：[H7_RFCC_CARE.md](H7_RFCC_CARE.md)
+> **完整汇报稿**：[FINAL_REPORT.md](FINAL_REPORT.md) · 精简口播：[REPORT_SPEECH_COMPLETE.md](REPORT_SPEECH_COMPLETE.md) · H7：[H7_RFCC_CARE.md](H7_RFCC_CARE.md)
 
 ---
 
