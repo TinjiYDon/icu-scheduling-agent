@@ -16,9 +16,19 @@ from typing import Any, Literal
 from ortools.sat.python import cp_model
 
 ObjectiveSense = Literal["max", "min"]
-ObjectiveMode = Literal["weighted_sum", "lexicographic", "epsilon_constraint"]
+ObjectiveMode = Literal[
+    "weighted_sum",
+    "lexicographic",
+    "epsilon_constraint",
+    "clinical_cascade",
+]
 
-SUPPORTED_MODES = ("weighted_sum", "lexicographic", "epsilon_constraint")
+SUPPORTED_MODES = (
+    "weighted_sum",
+    "lexicographic",
+    "epsilon_constraint",
+    "clinical_cascade",
+)
 
 
 @dataclass(frozen=True)
@@ -121,6 +131,7 @@ def solve_multiobjective(
     epsilon_primary: str | None = None,
     epsilon_bounds: Mapping[str, int | float] | None = None,
     max_time_seconds: float = 30.0,
+    cascade_context: Mapping[str, int] | None = None,
 ) -> MultiObjectiveSolveResult:
     """Solve one CP-SAT model with a selected multi-objective strategy.
 
@@ -139,6 +150,27 @@ def solve_multiobjective(
     stages: list[dict[str, int | float | str | bool]] = []
     started = perf_counter()
     exact_hierarchy = True
+    # H7 RFCC: scarcity gate selects clinical vs fill-first lex order.
+    if mode == "clinical_cascade":
+        from domain.optimizer.clinical_cascade import cascade_meta, cascade_order
+
+        ctx = dict(cascade_context or {})
+        n_pat = int(ctx.get("n_patients", len(specs)))
+        n_beds = int(ctx.get("n_beds", 1))
+        order = list(cascade_order(n_pat, n_beds, available=by_name.keys()))
+        meta = cascade_meta(n_pat, n_beds)
+        stages.append(
+            {
+                "objective": "clinical_cascade_gate",
+                "sense": "meta",
+                "status": str(meta["gate"]),
+                "wall_time_seconds": 0.0,
+                "exact": True,
+                "cascade_order": ",".join(order),
+            }
+        )
+        mode = "lexicographic"  # type: ignore[assignment]
+        objective_order = order
 
     if mode == "weighted_sum":
         resolved_weights = dict(weights or {})

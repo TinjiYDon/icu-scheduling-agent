@@ -1,11 +1,13 @@
 # 给老师的创新口径 · icu-scheduling-agent
 
 > 2026-10-09 · 与桌面汇报 PPT 对齐 · 不宣称 online PPO  
-> **口播脚本**：[DEMO_SCRIPT.md](DEMO_SCRIPT.md)（5–7 分钟 · 含多目标/对照页）
+> **总目标主线**：[MASTER_NARRATIVE.md](MASTER_NARRATIVE.md)  
+> **口播脚本**：[DEMO_SCRIPT.md](DEMO_SCRIPT.md)（5–7 分钟 · 含多目标/对照页）  
+> **大白话答疑**：[TEACHER_PLAIN.md](TEACHER_PLAIN.md)（「是不是太简单/拼接」怎么答）
 
 ## 一句话
 
-**骨干仍是 CP-SAT；加深的是同硬约束下三种多目标决策机理，以及压力场景与 Pareto 网格。**
+**总目标：可审计 · 可对照 · 可滚动。骨干仍是 CP-SAT；加深的是同硬约束下多目标机理、PtO 决策消融与滚动增益。**
 
 ## 不要这样讲
 
@@ -21,7 +23,12 @@
 | 实验 | 口头宣称稳 | 六场景 + HV | `reports/moo/`（本地） |
 | H3 对照 | 只展示 RL | **Fair 同池+同资源** CP-SAT / Greedy / PPO | `application/compare_policies.py` |
 | S3 深化 | 单次对照 | 多 episode 同池抽样 + 同资源均值表 | `evaluate_ppo_benchmark` · 对照页 Tab |
+| 方法 bake-off | 「只用了 OR-Tools」质疑 | 同池贪心 / WS / Lex / ε 对照表 | `run_method_bakeoff` → `reports/method_bakeoff_latest.json` |
 | 优先级消融 | 只用 SOFA 或只信 GBDT | SOFA-only vs 公式 vs GBDT · Spearman / top-k | `reports/priority_ablation.json` |
+| **H5 PtO** | 相关性≠决策 | 同池换紧迫度 → 分床 Jaccard/指标 | `run_pto_ablation` |
+| **H6 滚动** | 「滚动只是仿真壳」 | 再优化 vs 贪心填床 | `run_rolling_contrast` |
+| 价值判断 | 够不够学术 | 诚实够格表 | [`ACADEMIC_VALUE.md`](ACADEMIC_VALUE.md) |
+| 新旧对比+公式 | 「和以前比多了啥」 | 对照表 + \(x_{ib}\) / Lex / ε / Jaccard | [`REPORT_SPEECH.md`](REPORT_SPEECH.md) · [`MODEL_FORMULAS.md`](MODEL_FORMULAS.md) |
 
 ## 演示台
 

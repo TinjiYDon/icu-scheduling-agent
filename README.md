@@ -2,6 +2,10 @@
 
 独立开源项目 · 3 人协作 · 仓库 [icu-scheduling-agent](https://github.com/TinjiYDon/icu-scheduling-agent)
 
+**总目标 · 总内容（一条主线）**：[`docs/MASTER_NARRATIVE.md`](docs/MASTER_NARRATIVE.md)  
+**完整汇报稿（面面俱到）**：[`docs/FINAL_REPORT.md`](docs/FINAL_REPORT.md)  
+→ 可审计 · 可对照 · 可滚动的 ICU 床位动态调度（默认 CP-SAT；不接 decision 风险分）
+
 **协作入口**：[`docs/COLLABORATION.md`](docs/COLLABORATION.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md) · [`docs/BACKLOG.md`](docs/BACKLOG.md)
 
 ## 快速开始
@@ -20,6 +24,7 @@ $env:PYTHONPATH = (Get-Location)
 
 | 文档 | 说明 |
 |------|------|
+| [docs/MASTER_NARRATIVE.md](docs/MASTER_NARRATIVE.md) | **总目标 / 总内容 / 创新如何挂链** |
 | [docs/PROJECT_GUIDE.md](docs/PROJECT_GUIDE.md) | 架构、流程、命令 |
 | [docs/DUMP_READY.md](docs/DUMP_READY.md) | **线下 dump 单发 / restore** |
 | [docs/TUNING_LOCAL.md](docs/TUNING_LOCAL.md) | Plotly Ops 台启动 |
