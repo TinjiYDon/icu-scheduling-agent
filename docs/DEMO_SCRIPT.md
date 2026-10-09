@@ -3,7 +3,7 @@
 > 启动：`.\scripts\run_console.ps1` → http://localhost:8502  
 > 前置：已 restore scheduling P0 dump（见 [`DUMP_READY.md`](DUMP_READY.md)）  
 > 默认策略 **cp_sat**；**勿宣称** MIMIC 床旁 online PPO  
-> 创新口径对照：[`TEACHER_INNOVATION.md`](TEACHER_INNOVATION.md)
+> 创新口径对照：[`TEACHER_INNOVATION.md`](TEACHER_INNOVATION.md) · 大白话：[`TEACHER_PLAIN.md`](TEACHER_PLAIN.md)
 
 导航顺序建议：**项目 → 运行 → 多目标 → 对照 → 验收**（「方法」可作备用）。
 

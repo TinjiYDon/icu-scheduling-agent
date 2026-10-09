@@ -1,7 +1,8 @@
 # 项目状态
 
-> 更新：2026-10-09 · **独立调度** · **S2-MOO 1–5** + Fair H3（PR #11/#12）+ **S2-TRAJ** · 默认 CP-SAT  
+> 更新：2026-10-09 · **独立调度** · **S2-MOO 1–5** + Fair H3 + **方法 bake-off A** · 默认 CP-SAT  
 > **叙事**：仓内 SOFA/GBDT；**不**读 decision 风险分；有轨迹包仍**不**宣称 online MIMIC-PPO  
+> 老师大白话：[TEACHER_PLAIN.md](TEACHER_PLAIN.md) · 创新口径：[TEACHER_INNOVATION.md](TEACHER_INNOVATION.md)  
 > 方向：[TEAM_DIRECTION.md](TEAM_DIRECTION.md) · 整合：[INTEGRATION_PREP.md](INTEGRATION_PREP.md) · [S2_MULTI_OBJECTIVE.md](S2_MULTI_OBJECTIVE.md)
 
 ## 数据
@@ -54,6 +55,7 @@
 | PPO smoke | [`PPO_SMOKE.md`](PPO_SMOKE.md) · 代码在 main · **默认 cp_sat** · 离线轨迹≠ online |
 | H3 对照表 | ✅ **Fair 同池+同资源**：stay_ids + beds + isolation/vent/zones · PPO/贪心/CP-SAT assigned 均为 **4**（rate=0.20）· L4 `application.h3_ui` · Streamlit「对照」 |
 | S3 深化 | ✅ 多 episode fair benchmark · `python -m application.evaluate_ppo_benchmark --episodes 3` → `reports/ppo_benchmark.json` · 对照页「多 episode 深化」· 仍禁 online 宣称 |
+| 方法 bake-off A | ✅ 同池贪心 / WS / Lex / ε（ε 边界由 WS 值自适应）· `python -m application.run_method_bakeoff` → `reports/method_bakeoff_latest.json` · 答「是不是只拼了 OR-Tools」 |
 | 优先级消融 | ✅ SOFA-only vs 公式 vs GBDT · `python -m application.compare_priority` → `reports/priority_ablation.json` · Spearman(formula,GBDT)≈0.999 · top50 与 SOFA-only 重叠 0.24 |
 | 约束规则 | [`constraint_rules.yaml`](../configs/constraint_rules.yaml) · explain 披露启发式边界 |
 | RL 权重 | `optimizer.yaml` → `rl.reward_weights`（与 λ 解耦，含 occupancy） |
@@ -88,6 +90,20 @@ WS / Lex / ε mid **六场景均可解**（重标定后）。
 | S6 科室不均 | 4/11385/1 | 4/10811/2 | 不可行 |
 
 验收：`python -m application.run_moo_phase4 --split calib`
+
+## 方法 bake-off A（同池 · 2026-10-09）
+
+> `python -m application.run_method_bakeoff --candidate-patients 20` · ε 边界由 WS 值自适应  
+> 本地 `reports/method_bakeoff_latest.json`（不入库）· 大白话见 [`TEACHER_PLAIN.md`](TEACHER_PLAIN.md)
+
+| 方法 | 状态 | assigned | high_risk | wait | overload |
+|------|------|---------:|----------:|-----:|---------:|
+| greedy | ok | 5 | — | — | — |
+| Weighted Sum | OPTIMAL | 5 | 5 | 11000 | 12 |
+| Lexicographic | OPTIMAL | 5 | 5 | 11000 | 12 |
+| ε mid（自适应） | OPTIMAL | 5 | 5 | 11000 | 12 |
+
+> 本池四人打平：说明小池启发式已够用，**不**据此宣称 CP/RL 更优；证据点是「同池可复现对照」，不是「某一方法碾压」。
 
 ## S2-MOO 轻量三模式（calib · 2026-10-09 · restore 后冒烟）
 

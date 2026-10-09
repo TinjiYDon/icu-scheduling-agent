@@ -1,7 +1,8 @@
 # 给老师的创新口径 · icu-scheduling-agent
 
 > 2026-10-09 · 与桌面汇报 PPT 对齐 · 不宣称 online PPO  
-> **口播脚本**：[DEMO_SCRIPT.md](DEMO_SCRIPT.md)（5–7 分钟 · 含多目标/对照页）
+> **口播脚本**：[DEMO_SCRIPT.md](DEMO_SCRIPT.md)（5–7 分钟 · 含多目标/对照页）  
+> **大白话答疑**：[TEACHER_PLAIN.md](TEACHER_PLAIN.md)（「是不是太简单/拼接」怎么答）
 
 ## 一句话
 
@@ -21,6 +22,7 @@
 | 实验 | 口头宣称稳 | 六场景 + HV | `reports/moo/`（本地） |
 | H3 对照 | 只展示 RL | **Fair 同池+同资源** CP-SAT / Greedy / PPO | `application/compare_policies.py` |
 | S3 深化 | 单次对照 | 多 episode 同池抽样 + 同资源均值表 | `evaluate_ppo_benchmark` · 对照页 Tab |
+| 方法 bake-off | 「只用了 OR-Tools」质疑 | 同池贪心 / WS / Lex / ε 对照表 | `run_method_bakeoff` → `reports/method_bakeoff_latest.json` |
 | 优先级消融 | 只用 SOFA 或只信 GBDT | SOFA-only vs 公式 vs GBDT · Spearman / top-k | `reports/priority_ablation.json` |
 
 ## 演示台
