@@ -112,6 +112,7 @@ flowchart LR
 | 老师创新口径 | [TEACHER_INNOVATION.md](TEACHER_INNOVATION.md) | DEMO |
 | 报告词（含新旧对比） | [REPORT_SPEECH.md](REPORT_SPEECH.md) | 答辩口述 |
 | 模型与公式 | [MODEL_FORMULAS.md](MODEL_FORMULAS.md) | 板书 / 附录 |
+| 架构·创新·参数全览 | [ARCHITECTURE_INNOVATION_MATH.md](ARCHITECTURE_INNOVATION_MATH.md) | 投屏 / 答辩附录 |
 | Agent 契约 | 根目录 `AGENTS.md` | pytest 白名单 |
 
 **关键命令（顺着链）：**

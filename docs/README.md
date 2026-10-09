@@ -10,6 +10,7 @@
 | [REPORT_SPEECH_COMPLETE.md](REPORT_SPEECH_COMPLETE.md) | **推荐主讲稿（H7 着重 · 全要素 · ~10 分钟）** |
 | [MODEL_FORMULAS.md](MODEL_FORMULAS.md) | **模型 / 算法 / 数学公式** |
 | [H7_RFCC_CARE.md](H7_RFCC_CARE.md) | **具名创新：RFCC 机制 + CARE 指数** |
+| [ARCHITECTURE_INNOVATION_MATH.md](ARCHITECTURE_INNOVATION_MATH.md) | **架构·创新·公式·参数全览（展示用）** |
 | [COLLABORATION.md](COLLABORATION.md) | **3 人协作主手册** |
 | [BACKLOG.md](BACKLOG.md) | 垂直切片任务 |
 | [PROJECT_GUIDE.md](PROJECT_GUIDE.md) | 架构与命令 |
