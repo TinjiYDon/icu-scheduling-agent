@@ -39,7 +39,7 @@ $env:PYTHONPATH = (Get-Location)
 .\.venv\Scripts\python.exe -m application.evaluate_ppo_benchmark --episodes 5
 ```
 
-> 备注：`evaluate_ppo_benchmark` 会让 PPO / Greedy / CP-SAT 在同一批 `candidate_stay_ids` 上重复评估，适合做“深入对比”验收。
+> 备注：`evaluate_ppo_benchmark` 会让 PPO / Greedy / CP-SAT 在同一批 `candidate_stay_ids` **且同一资源布局**（隔离/呼吸机/分区）上重复评估；报告含 `fair_pool` 与 mean high_risk_wait。适合做 S3「深入对比」验收（仍禁 online 宣称）。
 
 ## 四、注意事项
 

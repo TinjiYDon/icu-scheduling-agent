@@ -18,7 +18,8 @@
 | P0 | Fair H3 同池 + 同资源布局 | ✅ PR #11 / #12 |
 | P1 | ε 按场景重标定 | ✅ `moo_epsilon_recal` |
 | P1 | eval 六场景表 | ✅ STATUS |
-| P1 | S3 同池 RL 对照深化 | 下一拍 |
+| P1 | S3 同池多 episode 深化 | ✅ fair stay_ids + resources |
+| P1 | 老师演示清单 | 下一拍 |
 | P2 | 压力场景 ε 仍不可行时披露 | 持续 |
 
 ## 非目标

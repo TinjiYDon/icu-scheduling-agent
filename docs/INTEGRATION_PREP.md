@@ -29,6 +29,7 @@
 | C5 | MOO 阶段 4 六场景 | ✅ 2026-09-29 |
 | C6 | Streamlit 三模式 UI | ✅ 与 C4 合并（PR #11） |
 | C7 | H3 同资源布局 + L4 封装 | ✅ PR #12（`h3_ui` / `moo_ui`） |
+| C8 | S3 多 episode fair benchmark | ✅ 对照页 Tab + `evaluate_ppo_benchmark` |
 
 ## 禁区
 

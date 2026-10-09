@@ -18,12 +18,14 @@
 |------|--------|----------|----------|
 | H4 | 只调一组权重 | 加权 / 词典序 / ε-约束 | `S2_MULTI_OBJECTIVE.md` · `STATUS.md` |
 | 实验 | 口头宣称稳 | 六场景 + HV | `reports/moo/`（本地） |
-| H3 对照 | 只展示 RL | **Fair 同池** CP-SAT / Greedy / PPO | `application/compare_policies.py` |
+| H3 对照 | 只展示 RL | **Fair 同池+同资源** CP-SAT / Greedy / PPO | `application/compare_policies.py` |
+| S3 深化 | 单次对照 | 多 episode 同池抽样 + 同资源均值表 | `evaluate_ppo_benchmark` · 对照页 Tab |
 | 优先级消融 | 只用 SOFA 或只信 GBDT | SOFA-only vs 公式 vs GBDT · Spearman / top-k | `reports/priority_ablation.json` |
 
 ## 演示台
 
-Streamlit：**多目标**页（含当场 ε）· **对照**页（H3）。  
+Streamlit：**多目标**页（含当场 ε）· **对照**页（H3 单次 + 多 episode 深化）。  
 `python -m application.compare_policies` → `reports/policy_comparison.json`  
+`python -m application.evaluate_ppo_benchmark --episodes 3` → `reports/ppo_benchmark.json`  
 `python -m application.run_moo_phase4 --split eval`  
 `python -m application.compare_priority` → `reports/priority_ablation.json`

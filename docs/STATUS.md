@@ -53,6 +53,7 @@
 | S2-TRAJ | ✅ 协议 1.0 导出验收 · `export_trajectory --steps 4` + schema 单测 · 见 [`TRAJECTORY_PROTOCOL.md`](TRAJECTORY_PROTOCOL.md) |
 | PPO smoke | [`PPO_SMOKE.md`](PPO_SMOKE.md) · 代码在 main · **默认 cp_sat** · 离线轨迹≠ online |
 | H3 对照表 | ✅ **Fair 同池+同资源**：stay_ids + beds + isolation/vent/zones · PPO/贪心/CP-SAT assigned 均为 **4**（rate=0.20）· L4 `application.h3_ui` · Streamlit「对照」 |
+| S3 深化 | ✅ 多 episode fair benchmark · `python -m application.evaluate_ppo_benchmark --episodes 3` → `reports/ppo_benchmark.json` · 对照页「多 episode 深化」· 仍禁 online 宣称 |
 | 优先级消融 | ✅ SOFA-only vs 公式 vs GBDT · `python -m application.compare_priority` → `reports/priority_ablation.json` · Spearman(formula,GBDT)≈0.999 · top50 与 SOFA-only 重叠 0.24 |
 | 约束规则 | [`constraint_rules.yaml`](../configs/constraint_rules.yaml) · explain 披露启发式边界 |
 | RL 权重 | `optimizer.yaml` → `rl.reward_weights`（与 λ 解耦，含 occupancy） |
