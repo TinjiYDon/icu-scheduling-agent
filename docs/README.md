@@ -1,7 +1,10 @@
 # 文档索引
 
+> **先读总线**：[MASTER_NARRATIVE.md](MASTER_NARRATIVE.md)（总目标 · 总内容 · 一条链串全仓）
+
 | 文档 | 内容 |
 |------|------|
+| [MASTER_NARRATIVE.md](MASTER_NARRATIVE.md) | **总目标 / 总内容 / H1–H6 挂点** |
 | [COLLABORATION.md](COLLABORATION.md) | **3 人协作主手册** |
 | [BACKLOG.md](BACKLOG.md) | 垂直切片任务 |
 | [PROJECT_GUIDE.md](PROJECT_GUIDE.md) | 架构与命令 |

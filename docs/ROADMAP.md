@@ -1,16 +1,17 @@
 # Roadmap · icu-scheduling-agent
 
-> 更新：2026-10-09（方法 bake-off A + 老师大白话 TEACHER_PLAIN）  
-> 人读：多目标多约束滚动调度；默认 CP-SAT；不接 decision 风险分。  
+> 更新：2026-10-09（**MASTER_NARRATIVE** 总目标主线 + bake-off / H5/H6）  
+> 人读：先 [MASTER_NARRATIVE.md](MASTER_NARRATIVE.md)；默认 CP-SAT；不接 decision 风险分。  
 > AI：**S2-MOO** ≠ **S2-TRAJ**；有离线轨迹仍不宣称 online MIMIC-PPO。
 
 ## Agent 上下文
 
 ```text
 repo: icu-scheduling-agent
-adopted: S2-MOO; fair H3; S3; bake-off A; H5 PtO; H6 rolling contrast; ACADEMIC_VALUE; L4
-vnext_p0: optional PPO zip offline smoke when artifacts present
-vnext_p1: literature table expand (SciRep 2023 ICU MOO etc.)
+SSOT_narrative: docs/MASTER_NARRATIVE.md
+goal: auditable + comparable + rolling ICU bed allocation
+adopted: S2-MOO; fair H3; S3; bake-off A; H5 PtO; H6 rolling; ACADEMIC_VALUE; L4
+vnext_p0: merge PR#16; optional PPO zip smoke
 forbidden: decision risk_score; claim online PPO from offline traj alone
 ```
 
@@ -41,6 +42,7 @@ forbidden: decision risk_score; claim online PPO from offline traj alone
 | **H5 PtO** | 优先级→分床决策质量消融 | ✅ 2026-10-09 | H5 |
 | **H6 滚动增益** | reoptimize vs 贪心填床 | ✅ 2026-10-09 | H6 |
 | **学术价值** | ACADEMIC_VALUE 诚实够格表 | ✅ 2026-10-09 | — |
+| **总目标主线** | MASTER_NARRATIVE 串全仓 | ✅ 2026-10-09 | 叙事 SSOT |
 
 ## 下一阶段计划
 

@@ -1,12 +1,13 @@
 # 给老师的创新口径 · icu-scheduling-agent
 
 > 2026-10-09 · 与桌面汇报 PPT 对齐 · 不宣称 online PPO  
+> **总目标主线**：[MASTER_NARRATIVE.md](MASTER_NARRATIVE.md)  
 > **口播脚本**：[DEMO_SCRIPT.md](DEMO_SCRIPT.md)（5–7 分钟 · 含多目标/对照页）  
 > **大白话答疑**：[TEACHER_PLAIN.md](TEACHER_PLAIN.md)（「是不是太简单/拼接」怎么答）
 
 ## 一句话
 
-**骨干仍是 CP-SAT；加深的是同硬约束下三种多目标决策机理，以及压力场景与 Pareto 网格。**
+**总目标：可审计 · 可对照 · 可滚动。骨干仍是 CP-SAT；加深的是同硬约束下多目标机理、PtO 决策消融与滚动增益。**
 
 ## 不要这样讲
 

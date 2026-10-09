@@ -1,6 +1,7 @@
 # 项目状态
 
-> 更新：2026-10-09 · **独立调度** · **S2-MOO 1–5** + Fair H3 + **方法 bake-off A** · 默认 CP-SAT  
+> 更新：2026-10-09 · **独立调度** · **S2-MOO 1–5** + Fair H3 + bake-off + **H5/H6** · 默认 CP-SAT  
+> **总目标主线**：[MASTER_NARRATIVE.md](MASTER_NARRATIVE.md)（可审计 · 可对照 · 可滚动）  
 > **叙事**：仓内 SOFA/GBDT；**不**读 decision 风险分；有轨迹包仍**不**宣称 online MIMIC-PPO  
 > 老师大白话：[TEACHER_PLAIN.md](TEACHER_PLAIN.md) · 创新口径：[TEACHER_INNOVATION.md](TEACHER_INNOVATION.md)  
 > 方向：[TEAM_DIRECTION.md](TEAM_DIRECTION.md) · 整合：[INTEGRATION_PREP.md](INTEGRATION_PREP.md) · [S2_MULTI_OBJECTIVE.md](S2_MULTI_OBJECTIVE.md)
