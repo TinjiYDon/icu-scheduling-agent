@@ -69,12 +69,16 @@ def evaluate_ppo(model_path: str | None = None) -> dict:
     seed = int(ppo.get("seed", 42))
     path = model_path or ppo.get("model_path", "artifacts/ppo_icu")
 
-    from domain.ops.h3_fair import annotate_fair_report, stay_ids_from_env
-    from domain.optimizer.resources import scale_bed_layout
+    from domain.ops.h3_fair import (
+        annotate_fair_report,
+        resource_overrides_from_env,
+        stay_ids_from_env,
+    )
 
     ppo_env = build_icu_env()
     stay_ids = stay_ids_from_env(ppo_env)
-    n_beds = len(list(ppo_env.beds))
+    resources = resource_overrides_from_env(ppo_env)
+    n_beds = int(resources["n_beds"])
     model = load_model(path, env=ppo_env)
     ppo_result = _enrich_policy_metrics(
         ppo_env, predict_assignments(model, ppo_env, seed=seed)
@@ -87,7 +91,7 @@ def evaluate_ppo(model_path: str | None = None) -> dict:
         run_id="evaluation_cp_sat_fair",
         persist=False,
         stay_ids=stay_ids,
-        resource_overrides=scale_bed_layout(n_beds),
+        resource_overrides=resources,
     )
 
     report = {
@@ -100,7 +104,9 @@ def evaluate_ppo(model_path: str | None = None) -> dict:
             "evaluation": _cp_sat_canonical(cp_sat_result.get("evaluation", {})),
         },
     }
-    report = annotate_fair_report(report, stay_ids=stay_ids, n_beds=n_beds)
+    report = annotate_fair_report(
+        report, stay_ids=stay_ids, n_beds=n_beds, resources=resources
+    )
     report["comparison_table"] = flatten_comparison(report)
     output = Path("reports/ppo_evaluation.json")
     output.parent.mkdir(parents=True, exist_ok=True)

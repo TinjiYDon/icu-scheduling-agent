@@ -25,10 +25,14 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    db = load_yaml("database.yaml")
-    url = db.get("database", {}).get("url")
-    if url:
-        return Settings(database_url=url)
+    # Prefer real configs/database.yaml; never treat *.example CHANGE_ME as live DSN.
+    path = CONFIG_DIR / "database.yaml"
+    if path.exists():
+        with path.open(encoding="utf-8") as f:
+            db = yaml.safe_load(f) or {}
+        url = (db.get("database") or {}).get("url")
+        if url and "CHANGE_ME" not in str(url):
+            return Settings(database_url=str(url))
     return Settings()
 
 

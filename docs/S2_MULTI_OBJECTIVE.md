@@ -86,7 +86,7 @@ balance <= ε_balance
 | 2 ✅ | 目标语义：`wait`→priority_served 披露；`overload`→高危落普通床；balance 区标准化 | `tests/test_objective_semantics.py`；旧 λ 键兼容 |
 | 3 ✅ | payoff table、ε 网格（A2）、非支配解与 hypervolume | `python -m application.run_moo_phase3` → `reports/moo/`；`tests/test_moo_phase3.py` |
 | 4 ✅ | 六场景对照（WS+Lex+ε mid） | `python -m application.run_moo_phase4`；`tests/test_moo_scenarios.py` |
-| 5 ✅ | Streamlit 三模式页 | 导航「多目标」；读 `reports/moo`；可当场跑 WS/Lex |
+| 5 ✅ | Streamlit 三模式页 | 导航「多目标」；L4 `application.moo_ui`；Pareto/CSV；当场 WS/Lex/ε |
 
 ## 实验场景
 

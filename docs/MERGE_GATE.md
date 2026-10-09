@@ -7,6 +7,7 @@
 | PR | 贡献 |
 |----|------|
 | [#10](https://github.com/TinjiYDon/icu-scheduling-agent/pull/10) | **S2-MOO（H4）** 三种多目标机理 |
+| [#11](https://github.com/TinjiYDon/icu-scheduling-agent/pull/11) | Fair H3 + 阶段 5 UI + ε 重标定 + CI test_plan |
 
 ## 合入优先序（下一拍）
 
@@ -16,7 +17,8 @@
 | ✅ | MOO 阶段 2 指标语义 | acuity `overload` + `priority_served` 披露 |
 | ✅ | MOO 阶段 3 ε 网格 / payoff | A2 calib：81/54/4 · HV=0.038794 |
 | ✅ | MOO 阶段 4 六场景 | 轻量 WS+Lex+ε；WS/Lex 全 OPTIMAL |
-| P0 | MOO 阶段 5 Streamlit | 展示先进性 |
+| ✅ | MOO 阶段 5 Streamlit | PR #11「多目标」+「对照」 |
+| P1 | H3 资源布局对齐 follow-up | CP-SAT 用 PPO env 隔离/呼吸机/分区（本地未推） |
 
 ## 已关闭
 

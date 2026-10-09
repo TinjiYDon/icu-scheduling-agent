@@ -85,6 +85,51 @@ def fig_occupancy_heatmap(history: Sequence[dict[str, Any]], n_beds: int) -> go.
     return fig
 
 
+def fig_pareto_2d(
+    front: Sequence[dict[str, Any]],
+    *,
+    x_obj: str = "wait",
+    y_obj: str = "high_risk",
+    title: str | None = None,
+) -> go.Figure:
+    """Scatter of nondominated points; accepts nested ``values`` dicts."""
+    xs: list[float] = []
+    ys: list[float] = []
+    texts: list[str] = []
+    for i, point in enumerate(front):
+        values = dict(point.get("values") or point)
+        try:
+            xs.append(float(values.get(x_obj, 0) or 0))
+            ys.append(float(values.get(y_obj, 0) or 0))
+        except (TypeError, ValueError):
+            continue
+        texts.append(str(point.get("source") or point.get("status") or i))
+    fig = go.Figure(
+        go.Scatter(
+            x=xs,
+            y=ys,
+            mode="markers+text",
+            text=texts,
+            textposition="top center",
+            marker=dict(size=12, color=TEAL),
+            name="front",
+        )
+    )
+    fig.update_layout(
+        title=title or f"Pareto 散点（{x_obj} × {y_obj}）",
+        xaxis_title=x_obj,
+        yaxis_title=y_obj,
+        height=360,
+        margin=dict(l=40, r=20, t=48, b=40),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(248,250,252,0.9)",
+        font=dict(color=SLATE),
+    )
+    fig.update_xaxes(gridcolor="#e2e8f0")
+    fig.update_yaxes(gridcolor="#e2e8f0")
+    return fig
+
+
 def fig_sofa_avg(history: Sequence[dict[str, Any]]) -> go.Figure:
     steps = [h.get("step", i) for i, h in enumerate(history)]
     sofa = [h.get("avg_sofa", 0) for h in history]

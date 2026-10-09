@@ -59,10 +59,12 @@ def flatten_comparison(report: dict[str, Any]) -> dict[str, Any]:
         "status": "ok",
         "primary_metrics": ["assignment_rate", "high_risk_wait", "constraint_violations"],
         "h3_note": (
-            "Fair pool when report.fair_pool=true (shared stay_ids + beds). "
+            "Fair pool when report.fair_pool=true "
+            "(shared stay_ids + beds + isolation/vent/zones when shared_resources set). "
             "Offline only — do not claim online MIMIC-PPO."
         ),
         "fair_pool": bool(report.get("fair_pool")),
+        "shared_resources": report.get("shared_resources"),
         "note": report.get("note"),
         "rows": rows,
     }
