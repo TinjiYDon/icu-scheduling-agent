@@ -154,6 +154,7 @@ def run_assignment(
     epsilon_bounds: Mapping[str, int | float] | None = None,
     max_time_seconds: float | None = None,
     resource_overrides: Mapping[str, object] | None = None,
+    priority_overrides: Mapping[int, float] | None = None,
 ) -> dict:
     """Run CP-SAT bed assignment.
 
@@ -175,6 +176,8 @@ def run_assignment(
         epsilon_bounds: direction-aware bounds for all non-primary objectives.
         max_time_seconds: optional CP-SAT wall-time override (phase-3 grids).
         resource_overrides: optional patch for ``resources.*`` (phase-4 scenarios).
+        priority_overrides: optional stay_id → priority_weight (PtO ablation);
+            does not write ``feat.patient_priority``.
     """
     if split is not None and split not in ("calib", "eval"):
         raise ValueError("split must be 'calib', 'eval' or None")
@@ -273,6 +276,18 @@ def run_assignment(
             ).mappings().all()
 
     stays = [dict(r) for r in rows]
+    if priority_overrides:
+        for s in stays:
+            sid = int(s["stay_id"])
+            if sid in priority_overrides:
+                s["priority_weight"] = float(priority_overrides[sid])
+        stays.sort(
+            key=lambda s: (
+                -float(s["priority_weight"]),
+                -float(s["sofa_total"]),
+                int(s["stay_id"]),
+            )
+        )
 
     # Restrict candidates to calib / eval subset (tuning only touches calib).
     split_meta = None

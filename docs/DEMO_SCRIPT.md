@@ -51,6 +51,12 @@
 - Layer1 行数门禁 ≈ 94458 stays / SOFA。  
 - 收尾三句：默认 CP-SAT · MOO 可解释 · PPO 离线对照、不宣称 online。
 
+### 6. 学术补强（可选 30s · 被问「创新够不够」时）
+
+- **H5**：换 SOFA/公式/GBDT 后，分床名单 Jaccard 可变（本地曾见 ≈0.11）→ 预测接到了决策。  
+- **H6**：同种子下滚动再优化 vs 只贪心填空床；增益如实报，不造假碾压。  
+- 够格表：[`ACADEMIC_VALUE.md`](ACADEMIC_VALUE.md)。
+
 ## 一键启动
 
 ```powershell
@@ -64,6 +70,9 @@ cd "C:\Users\lenovo\Desktop\decision shcedule\icu-scheduling-agent"
 ```powershell
 $env:PYTHONPATH = (Get-Location)
 .\.venv\Scripts\python.exe -m application.run_moo_phase4 --split eval --max-time 20
+.\.venv\Scripts\python.exe -m application.run_method_bakeoff --candidate-patients 20
+.\.venv\Scripts\python.exe -m application.run_pto_ablation --candidate-patients 40
+.\.venv\Scripts\python.exe -m application.run_rolling_contrast --steps 8
 # 有 PPO zip 时：
 # .\.venv\Scripts\python.exe -m application.compare_policies
 # .\.venv\Scripts\python.exe -m application.evaluate_ppo_benchmark --episodes 3

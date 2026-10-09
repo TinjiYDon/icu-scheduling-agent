@@ -56,6 +56,9 @@
 | H3 对照表 | ✅ **Fair 同池+同资源**：stay_ids + beds + isolation/vent/zones · PPO/贪心/CP-SAT assigned 均为 **4**（rate=0.20）· L4 `application.h3_ui` · Streamlit「对照」 |
 | S3 深化 | ✅ 多 episode fair benchmark · `python -m application.evaluate_ppo_benchmark --episodes 3` → `reports/ppo_benchmark.json` · 对照页「多 episode 深化」· 仍禁 online 宣称 |
 | 方法 bake-off A | ✅ 同池贪心 / WS / Lex / ε（ε 边界由 WS 值自适应）· `python -m application.run_method_bakeoff` → `reports/method_bakeoff_latest.json` · 答「是不是只拼了 OR-Tools」 |
+| **H5 PtO** | ✅ 同池换 SOFA/公式/GBDT → CP-SAT · `python -m application.run_pto_ablation` → `reports/pto_decision_ablation.json` |
+| **H6 滚动** | ✅ 再优化 vs 贪心填床 · `python -m application.run_rolling_contrast` → `reports/rolling_contrast.json` |
+| 学术够格 | 见 [`ACADEMIC_VALUE.md`](ACADEMIC_VALUE.md)（课设勉强；纯算法纸不够；系统+H4–H6 可辩护） |
 | 优先级消融 | ✅ SOFA-only vs 公式 vs GBDT · `python -m application.compare_priority` → `reports/priority_ablation.json` · Spearman(formula,GBDT)≈0.999 · top50 与 SOFA-only 重叠 0.24 |
 | 约束规则 | [`constraint_rules.yaml`](../configs/constraint_rules.yaml) · explain 披露启发式边界 |
 | RL 权重 | `optimizer.yaml` → `rl.reward_weights`（与 λ 解耦，含 occupancy） |
@@ -104,6 +107,29 @@ WS / Lex / ε mid **六场景均可解**（重标定后）。
 | ε mid（自适应） | OPTIMAL | 5 | 5 | 11000 | 12 |
 
 > 本池四人打平：说明小池启发式已够用，**不**据此宣称 CP/RL 更优；证据点是「同池可复现对照」，不是「某一方法碾压」。
+
+## H5 PtO 决策消融（同池 40 · 2026-10-09）
+
+> `python -m application.run_pto_ablation --candidate-patients 40`
+
+| 紧迫度 | assigned | wait(priority和) | Jaccard vs 公式 |
+|--------|--------:|----------------:|----------------:|
+| SOFA-only | 5 | 11000 | **0.11**（名单几乎全换） |
+| 公式 | 5 | 15084 | 1.00（参考） |
+| GBDT | 5 | 15085 | 1.00（与公式重合） |
+
+> **关键证据**：SOFA-only 与公式的分配集合 Jaccard≈0.11 → 预测层差异已传导到分床，不是只刷相关分。
+
+## H6 滚动对照（8 步 · 2026-10-09）
+
+> `python -m application.run_rolling_contrast --steps 8`
+
+| 策略 | 期末占用 | 时段均 SOFA | 时段均权重 |
+|------|--------:|----------:|----------:|
+| 滚动再优化 | 18 | 10.08 | 2.007 |
+| 贪心填空床 | 20 | 10.08 | 2.011 |
+
+> 本设定 SOFA 打平、占用略不同——**如实写入**；增益随到达/出院率变化，不保证每跑碾压。
 
 ## S2-MOO 轻量三模式（calib · 2026-10-09 · restore 后冒烟）
 

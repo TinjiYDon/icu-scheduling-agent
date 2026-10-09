@@ -8,9 +8,9 @@
 
 ```text
 repo: icu-scheduling-agent
-adopted: S2-MOO p1-p5; S2-TRAJ; fair H3; S3 multi-ep; method bake-off A; TEACHER_PLAIN; L4
+adopted: S2-MOO; fair H3; S3; bake-off A; H5 PtO; H6 rolling contrast; ACADEMIC_VALUE; L4
 vnext_p0: optional PPO zip offline smoke when artifacts present
-vnext_p1: keep STATUS numbers fresh after local moo/ppo runs
+vnext_p1: literature table expand (SciRep 2023 ICU MOO etc.)
 forbidden: decision risk_score; claim online PPO from offline traj alone
 ```
 
@@ -38,13 +38,17 @@ forbidden: decision risk_score; claim online PPO from offline traj alone
 | **S3 deepen** | 多 episode 同池+同资源 benchmark + 对照页 | ✅ PR #14 | H3 |
 | **演示清单** | DEMO_SCRIPT 含多目标/对照口播 | ✅ 2026-10-09 | — |
 | **方法 bake-off A** | 同池贪心/WS/Lex/ε + TEACHER_PLAIN | ✅ 2026-10-09 | H4 证据 |
+| **H5 PtO** | 优先级→分床决策质量消融 | ✅ 2026-10-09 | H5 |
+| **H6 滚动增益** | reoptimize vs 贪心填床 | ✅ 2026-10-09 | H6 |
+| **学术价值** | ACADEMIC_VALUE 诚实够格表 | ✅ 2026-10-09 | — |
 
 ## 下一阶段计划
 
 | 优先级 | 项 | 说明 |
 |--------|----|------|
-| **P1** | PPO zip 真跑冒烟 | 有 `artifacts/ppo_icu` 时点验（不入 Git） |
-| **P2** | STATUS 数字保鲜 | 本地 moo/ppo/bakeoff 跑完回写摘要表 |
+| **P1** | PPO zip 真跑冒烟 | 无 `artifacts/ppo_icu` 时跳过 |
+| **P2** | STATUS 回写 H5/H6 数字 | ✅ 2026-10-09 |
+| **P2** | 文献对标扩写 | ✅ SciRep 2023 / EJOR 2025 等写入 SOTA |
 
 ## 纠正
 

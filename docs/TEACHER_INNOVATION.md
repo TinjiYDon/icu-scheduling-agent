@@ -24,6 +24,9 @@
 | S3 深化 | 单次对照 | 多 episode 同池抽样 + 同资源均值表 | `evaluate_ppo_benchmark` · 对照页 Tab |
 | 方法 bake-off | 「只用了 OR-Tools」质疑 | 同池贪心 / WS / Lex / ε 对照表 | `run_method_bakeoff` → `reports/method_bakeoff_latest.json` |
 | 优先级消融 | 只用 SOFA 或只信 GBDT | SOFA-only vs 公式 vs GBDT · Spearman / top-k | `reports/priority_ablation.json` |
+| **H5 PtO** | 相关性≠决策 | 同池换紧迫度 → 分床 Jaccard/指标 | `run_pto_ablation` |
+| **H6 滚动** | 「滚动只是仿真壳」 | 再优化 vs 贪心填床 | `run_rolling_contrast` |
+| 价值判断 | 够不够学术 | 诚实够格表 | [`ACADEMIC_VALUE.md`](ACADEMIC_VALUE.md) |
 
 ## 演示台
 

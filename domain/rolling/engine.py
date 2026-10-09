@@ -19,14 +19,20 @@ def run_rolling_simulation(
     n_steps: int = 12,        # steps (each = rolling_hours)
     discharge_rate: float | None = None,
     admission_rate: float | None = None,
+    *,
+    reoptimize: bool = True,
 ) -> dict:
     """Simulate ICU scheduling over multiple time steps.
 
     Each step:
       1. Discharge some patients (random from currently occupied)
       2. Admit new patients (top of waiting queue by priority)
-      3. Run CP-SAT to reassign beds
+      3. Optionally re-run CP-SAT to reassign beds (``reoptimize=True``)
       4. Record metrics
+
+    When ``reoptimize=False`` (H6 static/greedy baseline): keep step-1
+    CP-SAT initial fill, then only discharge + greedy admit into free beds
+    — no per-step re-optimization. Same RNG seed schedule for fair contrast.
 
     Returns a dict with step-by-step metrics.
     """
@@ -119,35 +125,36 @@ def run_rolling_simulation(
                     newly_admitted += 1
             total_admissions += newly_admitted
 
-        # 2c. Re-optimize with CP-SAT every step (keep patients stable via move penalty)
-        candidate_ids = [occ["stay_id"] for occ in occupied.values()]
-        candidate_ids += [p["stay_id"] for p in queue[:max_patients(n_beds)]]
-        candidate_ids = list(dict.fromkeys(candidate_ids))  # dedup, keep order
-        occupied_beds_map = {occ["stay_id"]: bed for bed, occ in occupied.items()}
-        reopt = run_assignment(
-            stay_ids=candidate_ids,
-            occupied_beds=occupied_beds_map,
-            persist=False,
-        )
-        new_occupied: dict[int, dict] = {}
-        for a in reopt.get("top_assignments", []):
-            bed_id = a["bed_id"]
-            sid = a["stay_id"]
-            prev_bed = occupied_beds_map.get(sid)
-            steps = 0
-            if prev_bed is not None and prev_bed in occupied:
-                steps = occupied[prev_bed]["steps_in_icu"]
-            new_occupied[bed_id] = {
-                "stay_id": sid,
-                "weight": float(a["priority_weight"]),
-                "sofa": float(a["sofa_total"]),
-                "zone": a.get("bed_type", "?"),
-                "steps_in_icu": steps,
-            }
-        # Patients not assigned (or displaced) return to the queue
-        assigned_ids = {a["stay_id"] for a in reopt.get("top_assignments", [])}
-        queue = [p for p in queue if p["stay_id"] not in assigned_ids]
-        occupied = new_occupied
+        # 2c. Re-optimize with CP-SAT every step (optional; H6 baseline skips)
+        if reoptimize:
+            candidate_ids = [occ["stay_id"] for occ in occupied.values()]
+            candidate_ids += [p["stay_id"] for p in queue[:max_patients(n_beds)]]
+            candidate_ids = list(dict.fromkeys(candidate_ids))  # dedup, keep order
+            occupied_beds_map = {occ["stay_id"]: bed for bed, occ in occupied.items()}
+            reopt = run_assignment(
+                stay_ids=candidate_ids,
+                occupied_beds=occupied_beds_map,
+                persist=False,
+            )
+            new_occupied: dict[int, dict] = {}
+            for a in reopt.get("top_assignments", []):
+                bed_id = a["bed_id"]
+                sid = a["stay_id"]
+                prev_bed = occupied_beds_map.get(sid)
+                steps = 0
+                if prev_bed is not None and prev_bed in occupied:
+                    steps = occupied[prev_bed]["steps_in_icu"]
+                new_occupied[bed_id] = {
+                    "stay_id": sid,
+                    "weight": float(a["priority_weight"]),
+                    "sofa": float(a["sofa_total"]),
+                    "zone": a.get("bed_type", "?"),
+                    "steps_in_icu": steps,
+                }
+            # Patients not assigned (or displaced) return to the queue
+            assigned_ids = {a["stay_id"] for a in reopt.get("top_assignments", [])}
+            queue = [p for p in queue if p["stay_id"] not in assigned_ids]
+            occupied = new_occupied
 
         # Increment stay duration
         for occ in occupied.values():
@@ -168,6 +175,7 @@ def run_rolling_simulation(
         "final_occupancy": len(occupied),
         "n_beds": n_beds,
         "bed_utilization_pct": round(len(occupied) / n_beds * 100, 1),
+        "reoptimize": bool(reoptimize),
         "history": history,
     }
 
