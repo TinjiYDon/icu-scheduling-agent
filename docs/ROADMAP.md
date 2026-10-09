@@ -1,6 +1,6 @@
 # Roadmap · icu-scheduling-agent
 
-> 更新：2026-10-09（PR #11 已合入 · 阶段 5 UI + fair H3）  
+> 更新：2026-10-09（PR #12 已合入 · H3 同资源布局 + L4）  
 > 人读：多目标多约束滚动调度；默认 CP-SAT；不接 decision 风险分。  
 > AI：**S2-MOO** ≠ **S2-TRAJ**；有离线轨迹仍不宣称 online MIMIC-PPO。
 
@@ -8,10 +8,9 @@
 
 ```text
 repo: icu-scheduling-agent
-adopted: S2-MOO p1-p5; S2-TRAJ; fair H3; epsilon recal
-vnext_p0: H3 same-resource layout (isolation/vent/zones)
-vnext_p1: eval split already in STATUS
-vnext_p2: S3 RL compare on same pool
+adopted: S2-MOO p1-p5; S2-TRAJ; fair H3 + same resources; epsilon recal; L4 moo/h3
+vnext_p0: S3 RL compare on same pool (offline only)
+vnext_p1: teacher demo checklist on 多目标/对照 pages
 forbidden: decision risk_score; claim online PPO from offline traj alone
 ```
 
@@ -35,13 +34,14 @@ forbidden: decision risk_score; claim online PPO from offline traj alone
 | **S2-MOO 阶段 3** | payoff + A2 ε 网格 + HV | ✅ 2026-09-24 | H4 |
 | **S2-MOO 阶段 4** | 六场景轻量对照 | ✅ 2026-09-29 | H4 |
 | **S2-MOO 阶段 5** | Streamlit 三模式 + 对照页 | ✅ PR #11 | H4 / H3 |
+| **H3 fair+L4** | 同资源布局 · `moo_ui`/`h3_ui` · restore 重建 | ✅ PR #12 | H3 |
 
 ## 下一阶段计划
 
 | 优先级 | 项 | 说明 |
 |--------|----|------|
-| **P1** | H3 资源布局对齐 | CP-SAT 用 PPO env 的隔离/呼吸机/分区 |
-| **P2** | S3 | 同候选池 RL 对照深化 |
+| **P1** | S3 | 同候选池 RL 对照深化（仍禁 online 宣称） |
+| **P2** | 老师演示清单 | 多目标 / 对照页一口令脚本 |
 
 ## 纠正
 
