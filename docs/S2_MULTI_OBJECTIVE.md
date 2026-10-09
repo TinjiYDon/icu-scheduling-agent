@@ -1,6 +1,6 @@
 # S2-MOO：多目标求解方法对照
 
-> 状态：阶段 1–4 ✅（2026-09-29 · 六场景轻量对照）· 下一拍阶段 5（Streamlit）
+> 状态：阶段 1–5 ✅（2026-09-29 · 六场景 + Streamlit 三模式页）
 >
 > 范围：同一 ICU 候选池、床位资源和硬约束下，对比 Weighted Sum、Lexicographic 与 ε-Constraint。
 >
@@ -86,7 +86,7 @@ balance <= ε_balance
 | 2 ✅ | 目标语义：`wait`→priority_served 披露；`overload`→高危落普通床；balance 区标准化 | `tests/test_objective_semantics.py`；旧 λ 键兼容 |
 | 3 ✅ | payoff table、ε 网格（A2）、非支配解与 hypervolume | `python -m application.run_moo_phase3` → `reports/moo/`；`tests/test_moo_phase3.py` |
 | 4 ✅ | 六场景对照（WS+Lex+ε mid） | `python -m application.run_moo_phase4`；`tests/test_moo_scenarios.py` |
-| 5 | Streamlit 展示与论文表格 | 方法、Pareto 与敏感性图可解释 |
+| 5 ✅ | Streamlit 三模式页 | 导航「多目标」；读 `reports/moo`；可当场跑 WS/Lex |
 
 ## 实验场景
 

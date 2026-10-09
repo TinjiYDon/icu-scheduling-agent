@@ -22,4 +22,4 @@
 
 ## 下一拍
 
-Streamlit 三模式展示（阶段 5）；仍禁止 online MIMIC-PPO 宣称。
+阶段 5 UI + **eval 六场景 ε 全 OPTIMAL**（按场景重标定）+ **Fair H3** 已落文件；仍禁止 online MIMIC-PPO。

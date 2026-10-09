@@ -102,14 +102,19 @@ def render_methods() -> None:
     )
 
     st.header("4. 算法")
+    st.markdown(
+        "**底座**：CP-SAT 保证硬约束（隔离 / 呼吸机 / 一床一人）。"
+        "求解器品牌本身不是创新。"
+    )
     left, right = st.columns(2)
     with left:
-        st.subheader("4.1 CP-SAT（默认）")
+        st.subheader("4.1 多目标切口（H4）")
         st.markdown(
-            "基于 OR-Tools 的约束规划求解。"
-            "决策变量表示患者—床位匹配；硬约束包括床位容量、隔离床与呼吸机等。"
+            "同一套变量与硬约束，只换机理："
+            "**加权和**（基线）· **词典序**（层级锁最优）· **ε-约束**（Pareto 网格）。"
+            "演示见导航「多目标」页。"
         )
-        st.markdown("**加权多目标（示意）**")
+        st.markdown("**加权和（示意）**")
         st.latex(
             r"\max\;"
             r"\lambda_w f_{\mathrm{priority}}"
@@ -128,7 +133,7 @@ def render_methods() -> None:
 """
         )
     with right:
-        st.subheader("4.2 PPO（对照）")
+        st.subheader("4.2 PPO（对照，非默认）")
         st.markdown(
             "采用 MaskablePPO：按患者顺序决策「选择某张床」或「继续等待」。"
             f"当前检查点按 **{ppo.get('inference_n_beds', 20)} 床** 训练，"
