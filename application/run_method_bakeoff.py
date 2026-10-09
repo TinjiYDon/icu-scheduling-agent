@@ -114,6 +114,7 @@ def run_method_bakeoff(
             )
             mo = result.get("multiobjective") or {}
             ev = _cp_sat_canonical(result.get("evaluation") or {})
+            care = result.get("care_index") or {}
             row = {
                 "method": label,
                 "status": result.get("solver_status"),
@@ -124,6 +125,9 @@ def run_method_bakeoff(
                 "constraint_violations": ev.get("constraint_violations"),
                 "values": _mo_values(result),
                 "exact_hierarchy": mo.get("exact_hierarchy"),
+                "care": care.get("care"),
+                "uhrm": care.get("uhrm"),
+                "cascade_stages": mo.get("stages"),
             }
         except Exception as exc:  # noqa: BLE001
             row = {
@@ -137,7 +141,7 @@ def run_method_bakeoff(
         rows.append(row)
         return row
 
-    # --- WS then Lex; ε bounds derived from WS so mid-grid stays pool-feasible ---
+    # --- WS / Lex / ε / H7 RFCC clinical_cascade ---
     ws_row = _append_cp("weighted_sum", objective_mode="weighted_sum")
     _append_cp(
         "lexicographic",
@@ -151,6 +155,7 @@ def run_method_bakeoff(
         epsilon_primary=DEFAULT_PRIMARY,
         epsilon_bounds=eps_bounds,
     )
+    _append_cp("clinical_cascade", objective_mode="clinical_cascade")
 
     table = [flatten_bakeoff_row(r) for r in rows]
     report = {
@@ -163,12 +168,16 @@ def run_method_bakeoff(
         "shared_stay_ids": stay_ids,
         "epsilon_bounds": eps_bounds,
         "epsilon_bounds_note": "Derived from weighted_sum values (half max / 1.5× min), not fixed defaults.",
+        "innovation": {
+            "H7": "RFCC clinical_cascade + CARE/UHRM indices",
+            "mechanism": "Scarcity-Triggered Risk-First Clinical Cascade",
+        },
         "rows": table,
         "takeaways": bakeoff_takeaways(rows),
         "note": (
-            "Method bake-off on one fair pool (same stay_ids + bed layout). "
-            "Offline CP-SAT/greedy only — do not claim online MIMIC-PPO. "
-            "Innovation claim is multi-objective mechanism contrast, not 'we used OR-Tools'."
+            "Fair-pool bake-off including H7 RFCC (clinical_cascade). "
+            "Offline CP-SAT/greedy — do not claim online MIMIC-PPO. "
+            "Named mechanism + CARE index are the novelty claim, not OR-Tools itself."
         ),
     }
 

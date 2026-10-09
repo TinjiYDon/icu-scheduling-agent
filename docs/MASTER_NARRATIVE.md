@@ -79,6 +79,7 @@ flowchart LR
 | bake-off | 多目标+评测 | 专门答「是不是拼 OR-Tools」 | `run_method_bakeoff` |
 | **H5** | 紧迫度→分床 | 相关性不够，要看名单 Jaccard | `run_pto_ablation` |
 | **H6** | 滚动 | 再优化 vs 只往空床塞人 | `run_rolling_contrast` |
+| **H7** | 多目标 | **新机制 RFCC** + **新指数 CARE/UHRM** | [H7_RFCC_CARE.md](H7_RFCC_CARE.md) |
 
 详细够格与文献位置：[ACADEMIC_VALUE.md](ACADEMIC_VALUE.md) · [SOTA_SURVEY.md](SOTA_SURVEY.md)
 

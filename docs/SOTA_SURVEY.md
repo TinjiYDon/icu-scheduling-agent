@@ -62,6 +62,7 @@
 | **H4（采入）** | **S2-MOO**：同硬约束下三种多目标机理对照，优于「只调一组 λ」 | 单一加权和黑箱折中 | Weighted / Lex / ε-Constraint | 三模式状态/目标值/耗时可复现表；默认仍 `cp_sat` |
 | **H5（采入）** | **PtO 决策质量**：换紧迫度模型会改变分床结果 | 只报 Spearman/top-k | `priority_overrides` + 同池求解 | Jaccard/指标差；`run_pto_ablation` |
 | **H6（采入）** | **滚动再优化**优于只贪心填空床 | 一次性/无重优化滚动 | `reoptimize` 开关 | 时段均值 SOFA/权重；`run_rolling_contrast` |
+| **H7（采入）** | **RFCC** 稀缺触发风险优先级联 + **CARE/UHRM** 指数 | 占用优先 Lex / 只调 λ / 无综合指数 | `clinical_cascade` · `care_index` | bake-off CARE；见 [H7_RFCC_CARE.md](H7_RFCC_CARE.md) |
 
 ### 已采入工程落点（2026-09-24 · H5/H6 2026-10-09）
 
@@ -71,6 +72,7 @@
 | H3 | 对照表骨架已有 | 须 S2-TRAJ 闭合后才能强化 online 叙事 |
 | H5 | `application/run_pto_ablation.py` | 预测→决策闭环；不接 decision |
 | H6 | `application/run_rolling_contrast.py` | 滚动增益证据 |
+| H7 | `clinical_cascade` · `care_index.py` | **具名新机制+新指数** |
 
 ---
 

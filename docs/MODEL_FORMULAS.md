@@ -151,12 +151,28 @@ A,B\subseteq\mathcal{P}\text{ 为已分床患者集合。}
 
 ---
 
-## 7. 「以前没有 → 现在有」对照（公式视角）
+## 7. H7 新机制 RFCC + 新指数 CARE（具名创新）
+
+详见 [H7_RFCC_CARE.md](H7_RFCC_CARE.md)。
+
+**稀缺门控：** 若 \(n>B\)，词典序改为  
+\(\mathrm{high\_risk}\succ\mathrm{overload}\succ\mathrm{wait}\succ\mathrm{occupancy}\succ\cdots\)；  
+否则占用优先。
+
+**UHRM / CARE：**
+
+\[
+\mathrm{UHRM}=\sum_{i\in\mathcal{H},a_i=0}w_i,\quad
+\mathrm{CARE}=\mathrm{cover}-\alpha\cdot\mathrm{ov\_norm}-\beta\cdot\mathrm{uhrm\_norm}.
+\]
+
+## 8. 「以前没有 → 现在有」对照（公式视角）
 
 | 以前常见 | 对应公式/做法 | 现在多出来的 |
 |----------|---------------|--------------|
-| 只按分数排序塞床 | 无完整 \(x_{ib}\) 硬约束，或无隔离/呼吸机 | 完整 CP-SAT 硬约束组 |
-| 只调一组 \(\lambda\) | 仅 §3.1 | **同模型**再跑 §3.2、§3.3 |
-| 只报优先级相关 | Spearman\((u,u')\) | **H5** Jaccard\((A,A')\) |
-| 滚动只演示动画 | 无对照臂 | **H6** 再优化开关对照 |
-| 各方法各抽一批人 | 不可比 | Fair：相同 \(\mathcal{P}\)、相同 \(B,V,\mathcal{B}_{\mathrm{iso}}\) |
+| 只按分数排序塞床 | 无完整 \(x_{ib}\) 硬约束 | 完整 CP-SAT 硬约束组 |
+| 只调一组 \(\lambda\) / 占用优先 Lex | §3.1–3.2 | **H7 RFCC** 稀缺门控风险优先级联 |
+| 无综合临床指数 | 原始 \(f\) 分项 | **CARE / UHRM** |
+| 只报优先级相关 | Spearman | **H5** Jaccard |
+| 滚动无对照 | 动画 | **H6** |
+| 各抽各池 | 不可比 | Fair 同池 |

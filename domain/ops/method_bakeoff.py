@@ -56,6 +56,8 @@ def flatten_bakeoff_row(row: Mapping[str, Any]) -> dict[str, Any]:
         "high_risk": values.get("high_risk"),
         "wait": values.get("wait"),
         "overload": values.get("overload"),
+        "care": row.get("care"),
+        "uhrm": row.get("uhrm"),
         "exact_hierarchy": row.get("exact_hierarchy"),
         "error": row.get("error"),
     }
@@ -99,5 +101,21 @@ def bakeoff_takeaways(rows: Sequence[Mapping[str, Any]]) -> list[str]:
         elif g < w:
             notes.append("加权 CP-SAT 比贪心多分配了床位：全局优化相对局部规则有增益。")
 
-    notes.append("本对照不宣称 online MIMIC-PPO，也不把「使用了 OR-Tools」说成创新。")
+    rfcc = by_method.get("clinical_cascade") or {}
+    if rfcc.get("care") is not None and ws.get("care") is not None:
+        if float(rfcc["care"]) > float(ws["care"]) + 1e-6:
+            notes.append(
+                "H7 RFCC（clinical_cascade）的 CARE 指数高于加权和：稀缺门控下临床优先级联有效。"
+            )
+        elif rfcc.get("high_risk") is not None and ws.get("high_risk") is not None:
+            if int(rfcc["high_risk"]) > int(ws["high_risk"]):
+                notes.append("H7 RFCC 服务的高危人数多于加权和：风险优先序与占用优先序不同。")
+            else:
+                notes.append(
+                    "H7 RFCC 已纳入对照；本池 CARE/高危差可能不明显——如实报告。"
+                )
+    elif rfcc.get("status") in ("OPTIMAL", "FEASIBLE", "ok"):
+        notes.append("H7 RFCC（稀缺触发·风险优先临床级联）已跑通，作为相对 WS/Lex/ε 的新机理。")
+
+    notes.append("本对照不宣称 online MIMIC-PPO；创新点是 RFCC 机理 + CARE/UHRM 指数，不是 OR-Tools 本身。")
     return notes

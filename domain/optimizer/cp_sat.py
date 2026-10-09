@@ -169,8 +169,8 @@ def run_assignment(
         occupied_beds: optional mapping stay_id → current bed_id for patients
             already admitted. Assigning such a patient to a different bed adds
             a move penalty (f5) so re-optimization keeps patients stable.
-        objective_mode: ``weighted_sum`` (backward-compatible default),
-            ``lexicographic`` or ``epsilon_constraint``.
+        objective_mode: ``weighted_sum`` (default), ``lexicographic``,
+            ``epsilon_constraint``, or ``clinical_cascade`` (H7 RFCC).
         objective_order: priority order for lexicographic optimization.
         epsilon_primary: objective optimized by epsilon-constraint mode.
         epsilon_bounds: direction-aware bounds for all non-primary objectives.
@@ -519,15 +519,19 @@ def run_assignment(
     ]
 
     # ── 4. Solve ──────────────────────────────────────────────────
+    cascade_context = None
+    if objective_mode == "clinical_cascade":
+        cascade_context = {"n_patients": n, "n_beds": n_beds}
     multiobjective = solve_multiobjective(
         model,
         objective_specs,
-        mode=objective_mode,
+        mode=objective_mode,  # type: ignore[arg-type]
         weights=lam,
         objective_order=objective_order,
         epsilon_primary=epsilon_primary,
         epsilon_bounds=epsilon_bounds,
         max_time_seconds=solver_time,
+        cascade_context=cascade_context,
     )
     solver = multiobjective.solver
     status = multiobjective.status
@@ -598,6 +602,16 @@ def run_assignment(
     assigned_sofa_total = sum(float(a["sofa_total"]) for a in assignments)
     assigned_count = len(assignments)
 
+    from domain.ops.care_index import care_from_assignment_result
+
+    care_metrics = care_from_assignment_result(
+        {
+            "top_assignments": assignments,
+            "multiobjective": {"values": multiobjective.objective_values},
+        },
+        stays,
+    )
+
     return {
         "run_id": run_id,
         "assigned": len(assignments),
@@ -611,8 +625,9 @@ def run_assignment(
             "primary": epsilon_primary if objective_mode == "epsilon_constraint" else None,
             "epsilon_bounds": dict(epsilon_bounds or {}),
             "order": list(objective_order or [spec.name for spec in objective_specs])
-            if objective_mode == "lexicographic"
+            if objective_mode in ("lexicographic", "clinical_cascade")
             else None,
+            "cascade": cascade_context,
             "values": multiobjective.objective_values,
             "stages": multiobjective.stages,
             "exact_hierarchy": multiobjective.exact_hierarchy,
@@ -671,7 +686,14 @@ def run_assignment(
             "ventilator_utilization": round(
                 n_vent_used / n_vents, 4
             ) if n_vents else 0.0,
+            # H7 indices
+            "care": care_metrics.get("care"),
+            "uhrm": care_metrics.get("uhrm"),
+            "care_cover": care_metrics.get("care_cover"),
+            "care_overload_norm": care_metrics.get("care_overload_norm"),
+            "care_uhrm_norm": care_metrics.get("care_uhrm_norm"),
         },
+        "care_index": care_metrics,
         "resources": {
             "isolation_beds_used": f"{n_iso_used}/{n_iso_beds}",
             "ventilators_used": f"{n_vent_used}/{n_vents}",

@@ -43,6 +43,7 @@ forbidden: decision risk_score; claim online PPO from offline traj alone
 | **H6 滚动增益** | reoptimize vs 贪心填床 | ✅ 2026-10-09 | H6 |
 | **学术价值** | ACADEMIC_VALUE 诚实够格表 | ✅ 2026-10-09 | — |
 | **总目标主线** | MASTER_NARRATIVE 串全仓 | ✅ 2026-10-09 | 叙事 SSOT |
+| **H7 具名创新** | RFCC 机制 + CARE/UHRM 指数 | ✅ 2026-10-09 | H7 |
 
 ## 下一阶段计划
 

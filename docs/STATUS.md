@@ -59,7 +59,8 @@
 | 方法 bake-off A | ✅ 同池贪心 / WS / Lex / ε（ε 边界由 WS 值自适应）· `python -m application.run_method_bakeoff` → `reports/method_bakeoff_latest.json` · 答「是不是只拼了 OR-Tools」 |
 | **H5 PtO** | ✅ 同池换 SOFA/公式/GBDT → CP-SAT · `python -m application.run_pto_ablation` → `reports/pto_decision_ablation.json` |
 | **H6 滚动** | ✅ 再优化 vs 贪心填床 · `python -m application.run_rolling_contrast` → `reports/rolling_contrast.json` |
-| 学术够格 | 见 [`ACADEMIC_VALUE.md`](ACADEMIC_VALUE.md)（课设勉强；纯算法纸不够；系统+H4–H6 可辩护） |
+| **H7 RFCC+CARE** | ✅ **新机制** `clinical_cascade` + **新指数** CARE/UHRM · [`H7_RFCC_CARE.md`](H7_RFCC_CARE.md) · bake-off 含对照 |
+| 学术够格 | 见 [`ACADEMIC_VALUE.md`](ACADEMIC_VALUE.md)；具名创新点以 **H7** 为主主张 |
 | 优先级消融 | ✅ SOFA-only vs 公式 vs GBDT · `python -m application.compare_priority` → `reports/priority_ablation.json` · Spearman(formula,GBDT)≈0.999 · top50 与 SOFA-only 重叠 0.24 |
 | 约束规则 | [`constraint_rules.yaml`](../configs/constraint_rules.yaml) · explain 披露启发式边界 |
 | RL 权重 | `optimizer.yaml` → `rl.reward_weights`（与 λ 解耦，含 occupancy） |
