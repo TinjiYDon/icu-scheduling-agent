@@ -1,7 +1,8 @@
 # 项目报告词（可直接照着讲）
 
 > 用途：答辩 / 中期汇报 / 给老师的书面说明（结构版）  
-> **重点全讲版（一口气口播）**：[REPORT_SPEECH_FULL.md](REPORT_SPEECH_FULL.md)  
+> **推荐主讲稿（H7 着重）**：[REPORT_SPEECH_COMPLETE.md](REPORT_SPEECH_COMPLETE.md)  
+> 全讲版：[REPORT_SPEECH_FULL.md](REPORT_SPEECH_FULL.md)  
 > 主线对齐：[MASTER_NARRATIVE.md](MASTER_NARRATIVE.md)  
 > **禁止**宣称：首创求解器、online MIMIC-PPO、全面超越医院现网系统
 

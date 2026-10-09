@@ -6,7 +6,8 @@
 |------|------|
 | [MASTER_NARRATIVE.md](MASTER_NARRATIVE.md) | **总目标 / 总内容 / H1–H6 挂点** |
 | [REPORT_SPEECH.md](REPORT_SPEECH.md) | 报告词（结构版） |
-| [REPORT_SPEECH_FULL.md](REPORT_SPEECH_FULL.md) | **完整报告词（重点全讲 · 8–10 分钟）** |
+| [REPORT_SPEECH_FULL.md](REPORT_SPEECH_FULL.md) | 完整报告词（全讲版） |
+| [REPORT_SPEECH_COMPLETE.md](REPORT_SPEECH_COMPLETE.md) | **推荐主讲稿（H7 着重 · 全要素 · ~10 分钟）** |
 | [MODEL_FORMULAS.md](MODEL_FORMULAS.md) | **模型 / 算法 / 数学公式** |
 | [H7_RFCC_CARE.md](H7_RFCC_CARE.md) | **具名创新：RFCC 机制 + CARE 指数** |
 | [COLLABORATION.md](COLLABORATION.md) | **3 人协作主手册** |
