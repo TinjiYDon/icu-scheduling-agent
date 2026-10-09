@@ -5,7 +5,8 @@
 | 文档 | 内容 |
 |------|------|
 | [MASTER_NARRATIVE.md](MASTER_NARRATIVE.md) | **总目标 / 总内容 / H1–H6 挂点** |
-| [REPORT_SPEECH.md](REPORT_SPEECH.md) | **报告词：约束·目标·价值·新旧对比·实用·学术** |
+| [REPORT_SPEECH.md](REPORT_SPEECH.md) | 报告词（结构版） |
+| [REPORT_SPEECH_FULL.md](REPORT_SPEECH_FULL.md) | **完整报告词（重点全讲 · 8–10 分钟）** |
 | [MODEL_FORMULAS.md](MODEL_FORMULAS.md) | **模型 / 算法 / 数学公式** |
 | [COLLABORATION.md](COLLABORATION.md) | **3 人协作主手册** |
 | [BACKLOG.md](BACKLOG.md) | 垂直切片任务 |
