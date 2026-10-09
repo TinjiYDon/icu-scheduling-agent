@@ -29,6 +29,6 @@ $env:PYTHONPATH = (Get-Location)
 ```text
 SSOT: docs/STATUS.md · docs/TEAM_DIRECTION.md · docs/S2_MULTI_OBJECTIVE.md
 adopted: S2-MOO = H4
-next: S3 RL same-pool deepen; teacher demo on 多目标/对照
+next: teacher demo checklist; optional PPO zip smoke
 禁区: dumps/ · decision risk_score
 ```

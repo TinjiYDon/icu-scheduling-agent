@@ -1,17 +1,14 @@
-"""Multi-episode PPO benchmark on matched candidate sets."""
+"""Multi-episode PPO / greedy / CP-SAT benchmark on matched fair pools."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
-from domain.optimizer.cp_sat import run_assignment
-from domain.rl.data_adapter import load_patients
-from domain.rl.evaluation import evaluate_greedy
-from domain.rl.factory import build_icu_env
-from domain.rl.policy import load_model, predict_assignments
+from domain.ops.h3_benchmark import summarize_benchmark_episodes
 from infra.config import load_yaml
 
 
@@ -23,6 +20,14 @@ def evaluate_ppo_benchmark(
     model_path: str | None = None,
     output_path: str | None = None,
 ) -> dict:
+    from application.evaluate_ppo import _cp_sat_canonical, _enrich_policy_metrics
+    from domain.ops.h3_fair import annotate_fair_report, resource_overrides_from_env
+    from domain.optimizer.cp_sat import run_assignment
+    from domain.rl.data_adapter import load_patients
+    from domain.rl.evaluation import evaluate_greedy
+    from domain.rl.factory import build_icu_env
+    from domain.rl.policy import load_model, predict_assignments
+
     config = load_yaml("optimizer.yaml")
     ppo = config.get("ppo", {})
     default_seed = int(ppo.get("seed", 42))
@@ -32,9 +37,13 @@ def evaluate_ppo_benchmark(
     seed = int(seed if seed is not None else default_seed)
     episodes = int(episodes if episodes is not None else default_episodes)
     candidate_patients = int(
-        candidate_patients if candidate_patients is not None else default_candidate_patients
+        candidate_patients
+        if candidate_patients is not None
+        else default_candidate_patients
     )
-    pool_patients = int(pool_patients if pool_patients is not None else default_pool_patients)
+    pool_patients = int(
+        pool_patients if pool_patients is not None else default_pool_patients
+    )
     path = model_path or ppo.get("model_path", "artifacts/ppo_icu")
     output = Path(output_path or "reports/ppo_benchmark.json")
 
@@ -47,23 +56,34 @@ def evaluate_ppo_benchmark(
     rng = np.random.default_rng(seed)
     pool_ids = [patient.stay_id for patient in pool]
     episode_reports: list[dict] = []
+    shared_resources: dict[str, Any] | None = None
 
     for episode_index in range(episodes):
         episode_seed = seed + episode_index
-        sampled_ids = rng.choice(pool_ids, size=candidate_patients, replace=False).tolist()
+        sampled_ids = [
+            int(x)
+            for x in rng.choice(pool_ids, size=candidate_patients, replace=False).tolist()
+        ]
         ppo_env = build_icu_env(candidate_stay_ids=sampled_ids)
+        resources = resource_overrides_from_env(ppo_env)
+        n_beds = int(resources["n_beds"])
+        if shared_resources is None:
+            shared_resources = dict(resources)
+
         model = load_model(path, env=ppo_env)
-        ppo_result = predict_assignments(
-            model,
+        ppo_result = _enrich_policy_metrics(
             ppo_env,
-            seed=episode_seed,
-            policy_name="ppo",
+            predict_assignments(model, ppo_env, seed=episode_seed, policy_name="ppo"),
         )
-        greedy_result = evaluate_greedy(build_icu_env(candidate_stay_ids=sampled_ids), seed=episode_seed)
+        greedy_env = build_icu_env(candidate_stay_ids=sampled_ids, n_beds=n_beds)
+        greedy_result = _enrich_policy_metrics(
+            greedy_env, evaluate_greedy(greedy_env, seed=episode_seed)
+        )
         cp_sat_result = run_assignment(
             run_id=f"ppo_benchmark_{episode_index}",
             stay_ids=sampled_ids,
             persist=False,
+            resource_overrides=resources,
         )
 
         episode_reports.append(
@@ -71,54 +91,41 @@ def evaluate_ppo_benchmark(
                 "episode": episode_index + 1,
                 "seed": episode_seed,
                 "candidate_stay_ids": sampled_ids,
+                "shared_n_beds": n_beds,
+                "shared_resources": resources,
                 "ppo": ppo_result,
                 "greedy": greedy_result,
                 "cp_sat": {
                     "assigned": cp_sat_result.get("assigned", 0),
                     "n_stays": cp_sat_result.get("n_stays", 0),
-                    "evaluation": cp_sat_result.get("evaluation", {}),
+                    "evaluation": _cp_sat_canonical(
+                        cp_sat_result.get("evaluation", {})
+                    ),
                 },
             }
         )
 
-    def _avg(key: str) -> float:
-        values = [float(report["ppo"].get(key, 0.0)) for report in episode_reports]
-        return round(sum(values) / max(len(values), 1), 4)
-
-    def _avg_greedy(key: str) -> float:
-        values = [float(report["greedy"].get(key, 0.0)) for report in episode_reports]
-        return round(sum(values) / max(len(values), 1), 4)
-
-    summary = {
-        "episodes": episodes,
-        "seed": seed,
-        "candidate_patients": candidate_patients,
-        "pool_patients": len(pool),
-        "model_path": path,
-        "same_candidate_scale": True,
-        "ppo": {
-            "mean_assigned": _avg("assigned"),
-            "mean_total_reward": _avg("total_reward"),
-        },
-        "greedy": {
-            "mean_assigned": _avg_greedy("assigned"),
-            "mean_total_reward": _avg_greedy("total_reward"),
-        },
-        "cp_sat": {
-            "mean_assigned": round(
-                sum(float(report["cp_sat"]["assigned"]) for report in episode_reports)
-                / max(len(episode_reports), 1),
-                4,
-            ),
-        },
-        "note": "每个 episode 内 PPO / greedy / CP-SAT 使用同一批 candidate_stay_ids。",
-        "episodes_detail": episode_reports,
-    }
-
-    report = {
+    summary = summarize_benchmark_episodes(
+        episode_reports,
+        episodes=episodes,
+        seed=seed,
+        candidate_patients=candidate_patients,
+        pool_patients=len(pool),
+        model_path=path,
+    )
+    report: dict[str, Any] = {
         "status": "ok",
         "summary": summary,
     }
+    report = annotate_fair_report(
+        report,
+        stay_ids=pool_ids[:candidate_patients],
+        n_beds=int((shared_resources or {}).get("n_beds", 20)),
+        resources=shared_resources,
+    )
+    report["note"] = summary["note"]
+    report["fair_pool"] = True
+
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     return report
@@ -127,8 +134,12 @@ def evaluate_ppo_benchmark(
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="多 episode PPO / Greedy / CP-SAT 同候选规模 benchmark")
-    parser.add_argument("--episodes", type=int, default=None, help="episode 数，默认读取 optimizer.yaml")
+    parser = argparse.ArgumentParser(
+        description="多 episode PPO / Greedy / CP-SAT 同候选+同资源 benchmark"
+    )
+    parser.add_argument(
+        "--episodes", type=int, default=None, help="episode 数，默认读取 optimizer.yaml"
+    )
     parser.add_argument(
         "--candidate-patients",
         type=int,

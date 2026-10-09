@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from application.h3_ui import load_comparison_table
+from application.h3_ui import load_benchmark, load_comparison_table
 
 
 def test_load_comparison_missing(tmp_path):
@@ -41,3 +41,8 @@ def test_load_raw_ppo_evaluation_flattens(tmp_path):
     out = load_comparison_table(tmp_path)
     assert out["status"] == "ok"
     assert len(out["payload"]["rows"]) == 3
+
+
+def test_load_benchmark_missing(tmp_path):
+    out = load_benchmark(tmp_path)
+    assert out["status"] == "missing"

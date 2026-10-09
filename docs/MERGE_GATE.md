@@ -20,7 +20,7 @@
 | ✅ | MOO 阶段 4 六场景 | 轻量 WS+Lex+ε；WS/Lex 全 OPTIMAL |
 | ✅ | MOO 阶段 5 Streamlit | PR #11「多目标」+「对照」 |
 | ✅ | H3 资源布局对齐 follow-up | PR #12 |
-| P1 | S3 同池 RL 对照深化 | 离线；不宣称 online MIMIC-PPO |
+| ✅ | S3 同池多 episode 深化 | fair benchmark + 对照页 Tab |
 
 ## 已关闭
 
