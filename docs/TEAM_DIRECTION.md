@@ -29,6 +29,6 @@ $env:PYTHONPATH = (Get-Location)
 ```text
 SSOT: docs/STATUS.md · docs/TEAM_DIRECTION.md · docs/S2_MULTI_OBJECTIVE.md
 adopted: S2-MOO = H4
-next: teacher demo checklist; optional PPO zip smoke
+next: optional PPO zip smoke; refresh STATUS after local runs
 禁区: dumps/ · decision risk_score
 ```

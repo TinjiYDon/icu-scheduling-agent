@@ -19,7 +19,8 @@
 | P1 | ε 按场景重标定 | ✅ `moo_epsilon_recal` |
 | P1 | eval 六场景表 | ✅ STATUS |
 | P1 | S3 同池多 episode 深化 | ✅ fair stay_ids + resources |
-| P1 | 老师演示清单 | 下一拍 |
+| P1 | 老师演示清单 | ✅ `DEMO_SCRIPT.md` |
+| P1 | PPO zip 真跑冒烟 | 有 artifacts 时 |
 | P2 | 压力场景 ε 仍不可行时披露 | 持续 |
 
 ## 非目标
