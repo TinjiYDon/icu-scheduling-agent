@@ -10,7 +10,7 @@
 |----|------|
 | Layer0 labevents | ✅ 158,374,764 |
 | feat.sofa_timeseries | ✅ 94,458（真实 SOFA · 0~12 · avg 4.74）|
-| dump | ✅ `dumps/icu_scheduling_P0-full_mimic_94458stays_20260802.dump` · 见 [`DUMP_READY.md`](DUMP_READY.md) |
+| dump | ✅ 旁路目录 `..\dump\icu_scheduling_P0-full_mimic_94458stays_20260802.dump` · 见 [`DUMP_READY.md`](DUMP_READY.md) |
 | 交互台 | ✅ **Plotly Ops 台** · 导航含 **多目标** / **对照(H3)** · `.\scripts\run_console.ps1` |
 | 下一步 | [`TOP_TIER_NEXT.md`](TOP_TIER_NEXT.md) |
 | 交付说明 | [`DUMP_READY.md`](DUMP_READY.md) |

@@ -25,9 +25,10 @@
 | C1 | S2-TRAJ 导出验收对照 `TRAJECTORY_PROTOCOL.md` | ✅ 2026-09-24 |
 | C2 | MOO 阶段 2：wait/overload 语义 | ✅ 2026-09-24（acuity overload） |
 | C3 | STATUS 写入三模式对照表（真数） | ✅ 阶段 3 calib 摘要已写入 STATUS |
-| C4 | Streamlit 三模式 UI | P2 |
+| C4 | Streamlit 三模式 UI | ✅ PR #11 |
 | C5 | MOO 阶段 4 六场景 | ✅ 2026-09-29 |
-| C6 | Streamlit 三模式 UI | **下一拍** |
+| C6 | Streamlit 三模式 UI | ✅ 与 C4 合并（PR #11） |
+| C7 | H3 同资源布局 + L4 封装 | 本地 follow-up（`h3_ui` / `moo_ui`） |
 
 ## 禁区
 
