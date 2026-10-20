@@ -35,7 +35,7 @@ $env:PYTHONPATH = (Get-Location)
 .\scripts\run_data_pipeline.ps1
 ```
 
-### 3. 仿真与演示（成员 C 骨架 ✅）
+### 3. 仿真与演示
 
 ```powershell
 $env:PYTHONPATH = (Get-Location)
@@ -48,22 +48,34 @@ L4：`run_simulation_with_plan()` · `get_plan()` — Ops/Accept 监测台见 [`
 ### 从已有 dump 恢复
 
 ```powershell
-.\scripts\restore_layer1.ps1 -DumpFile .\dumps\icu_scheduling_P0-full_mimic_94458stays_20260802.dump
+.\scripts\restore_layer1.ps1 -DumpFile .\dumps\icu_scheduling_P0-full_*.dump
 ```
 
 详见 [`DUMP_READY.md`](DUMP_READY.md)。
 
-## 检查点一览
+## 命令入口
 
-| 阶段 | 状态 |
+| 用途 | 命令 |
 |------|------|
-| ETL + dump + 冒烟 | **已完成** |
-| CP-SAT + Plotly Ops | ✅ |
-| online PPO 轨迹 | ❌ 无 MIMIC 轨迹包 |
+| ETL 检查点 | `python -m application.run_etl_stage` |
+| ETL + 仿真 | `python -m application.run_p0` |
+| 滚动仿真 | `python -m application.simulate` |
+| 策略选择（cp_sat / ppo） | `python -m application.optimize` |
+| GBDT 优先级 | `python -m application.train_priority` |
+| PPO 训练 / 推理 / 对照评估 | `python -m application.train_ppo` · `run_ppo` · `evaluate_ppo` |
+| MCP | `python -m presentation.mcp_server` |
+| Ops 台 | `.\scripts\run_console.ps1` |
+
+## PPO 模块契约
+
+- 环境每次决策一个患者：动作 `0..n_beds-1` 选床，`n_beds` 表示继续等待。
+- 调用方构造固定 episode 的 `Patient` / `Bed`；`ICUEnv` 本身不查库。
+- 训练与推理都必须使用 `action_masks()`，不能只依赖非法动作惩罚。
+- 默认策略仍是 `cp_sat`；PPO 仅作对照，`artifacts/ppo_icu.zip` 不入库。
 
 ## dump 命名
 
-当前交付：`icu_scheduling_P0-full_mimic_94458stays_20260802.dump`（`dumps/`，不入 Git）
+`dumps/icu_scheduling_P0-full_<mimic_source>_<stays>stays_<yyyymmdd>.dump`（**不入 Git**）。
 
 ## 注意
 

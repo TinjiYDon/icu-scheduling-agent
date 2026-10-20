@@ -14,7 +14,7 @@ L5 presentation  →  L4 application  →  L3 domain  →  L2 data_access  →  
 ```powershell
 $env:PYTHONPATH = (Get-Location)
 pytest tests/test_smoke.py tests/test_db.py tests/test_etl.py -q
-# 若改仿真：pytest tests/test_simulate.py -q（存在时）
+# 若改仿真：pytest tests/test_simulate_metrics.py tests/test_plan.py -q
 ```
 
 ## Pull Request / Issue
