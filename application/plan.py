@@ -59,7 +59,7 @@ def get_plan(run_id: str | None = None, sim_metrics: dict[str, Any] | None = Non
 
 
 def run_simulation_with_plan(n_steps: int = 12) -> dict[str, Any]:
-    """L4: CP-SAT assignment + rolling occupancy, for Streamlit / MCP."""
+    """L4: CP-SAT assignment + rolling occupancy summary (CLI / batch entry)."""
     assign = run_assignment()
     rolling = run_simulate(n_steps=int(n_steps))
     plan = get_plan(assign.get("run_id"), sim_metrics=assign)

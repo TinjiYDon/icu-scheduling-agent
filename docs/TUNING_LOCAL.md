@@ -1,17 +1,15 @@
-# 本地学习 / 调参环境
-
-> 更新：2026-08-02 · **演示台 v4**（项目 / 运行 / 验收）
+# 本地实验查看
 
 | 工具 | 用途 | 入口 |
 |------|------|------|
-| Streamlit Ops | CP-SAT + 滚动占用 / 热力 / 可解释 | `.\scripts\run_console.ps1` |
-| MLflow UI | simulate KPI 历史 | `mlflow ui --backend-store-uri sqlite:///./mlflow.db` |
-| dump | 20260802 full | [`DUMP_READY.md`](DUMP_READY.md) |
+| MLflow UI | `run_simulation_with_plan` 的 KPI 历史 | `mlflow ui --backend-store-uri sqlite:///./mlflow.db` |
+| λ 网格搜索 | 生成 `reports/lambda_tuning_*.csv|json` | `python scripts/tune_lambda.py --split calib` |
+| dump | restore / 导出 | [`DUMP_READY.md`](DUMP_READY.md) |
 
 ```powershell
-cd d:\project\icu-scheduling-agent
-.\scripts\run_console.ps1
-# 默认 http://localhost:8502
+$env:PYTHONPATH = (Get-Location)
+.\.venv\Scripts\python.exe -m application.simulate
+.\.venv\Scripts\python.exe -m mlflow ui --backend-store-uri sqlite:///./mlflow.db
 ```
 
-勿用裸 `streamlit`（需 venv）。
+仿真 KPI 由 `application/plan.py` 写入 MLflow（不可用时会在返回 JSON 的 `mlflow_error` 里说明，不中断仿真）。

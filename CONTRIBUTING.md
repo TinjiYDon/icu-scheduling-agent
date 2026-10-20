@@ -3,11 +3,11 @@
 ## 分层规则
 
 ```
-L5 presentation  →  L4 application  →  L3 domain  →  L2 data_access  →  L1 infra
+L4 application  →  L3 domain  →  L2 data_access  →  L1 infra
 ```
 
-- Streamlit **禁止**直接 import `domain.optimizer`
 - `domain/` **禁止**直接连库
+- SQL 只写在 `data_access/`
 
 ## 合并门槛
 

@@ -12,18 +12,18 @@
 当前本地副本：`dumps/icu_scheduling_P0-full_mimic_94458stays_20260727.dump`  
 **SHA-256**：`7df1e4655c9e5742568ce34a55239c95cc7dc6154a7f2477203e05a5eba503a6`
 
-## 恢复 + Ops 台
+## 恢复 + 校验
 
 ```powershell
 .\scripts\restore_layer1.ps1 -DumpFile .\dumps\icu_scheduling_P0-full_mimic_94458stays_20260727.dump
 $env:PYTHONPATH = (Get-Location)
-.\.venv\Scripts\python.exe -m streamlit run presentation/streamlit_app.py --server.port 8502
+.\.venv\Scripts\python.exe -m application.simulate
 ```
 
 - 未安装宿主 `pg_restore` 时，脚本自动改用 `docker exec`（需 `icu_scheduling_pg16` 容器在运行；`dumps/` 已挂载为 `/dumps`）。
 - 目标库默认 `icu_scheduling`，可用 `-Database <name>` 恢复到他库；端口按 `configs/database.yaml` 解析。
 
-验收：`staging.icustays` / `feat.sofa_timeseries` ≈ **94458**；Ops 页 Run → solver OPTIMAL。
+验收：`staging.icustays` / `feat.sofa_timeseries` ≈ **94458**；`application.simulate` 返回 `solver_status=OPTIMAL`。
 
 ## 禁止
 

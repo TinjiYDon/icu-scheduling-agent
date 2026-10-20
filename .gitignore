@@ -38,6 +38,3 @@ Thumbs.db
 
 # Jupyter
 .ipynb_checkpoints/
-
-# Streamlit
-.streamlit/secrets.toml

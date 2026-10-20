@@ -18,8 +18,6 @@ dependencies = [
     "sb3-contrib>=2.4",
     "pydantic-settings>=2.0",
     "pyyaml>=6.0",
-    "streamlit>=1.32",
-    "plotly>=5.20",
 ]
 
 [project.optional-dependencies]
@@ -31,7 +29,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["infra*", "data_access*", "domain*", "application*", "presentation*"]
+include = ["infra*", "data_access*", "domain*", "application*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

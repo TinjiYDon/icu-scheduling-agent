@@ -5,7 +5,7 @@
 ## 架构
 
 ```
-Layer0 (MIMIC) → ETL → SOFA → CP-SAT / PPO → Streamlit
+Layer0 (MIMIC) → ETL → SOFA → CP-SAT / PPO
 PostgreSQL: icu_scheduling
 ```
 
@@ -38,15 +38,14 @@ $env:PYTHONPATH = (Get-Location)
 .\scripts\run_data_pipeline.ps1
 ```
 
-### 3. 仿真与演示
+### 3. 仿真
 
 ```powershell
 $env:PYTHONPATH = (Get-Location)
 .\.venv\Scripts\python.exe -m application.simulate
-.\.venv\Scripts\python.exe -m streamlit run presentation/streamlit_app.py --server.port 8502
 ```
 
-L4：`run_simulation_with_plan()` · `get_plan()` — Ops/Accept 监测台见 [`TUNING_LOCAL.md`](TUNING_LOCAL.md)
+L4：`run_simulation_with_plan()` · `get_plan()`（输出 JSON，可接任意上层调用方）
 
 ### 从已有 dump 恢复
 
@@ -66,8 +65,7 @@ L4：`run_simulation_with_plan()` · `get_plan()` — Ops/Accept 监测台见 [`
 | 策略选择（cp_sat / ppo） | `python -m application.optimize` |
 | GBDT 优先级 | `python -m application.train_priority` |
 | PPO 训练 / 推理 / 对照评估 | `python -m application.train_ppo` · `run_ppo` · `evaluate_ppo` |
-| MCP | `python -m presentation.mcp_server` |
-| Ops 台 | `.\scripts\run_console.ps1` |
+| λ 网格搜索 | `python scripts/tune_lambda.py --split calib` |
 
 ## PPO 模块契约
 

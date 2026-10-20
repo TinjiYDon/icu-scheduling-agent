@@ -23,7 +23,7 @@ $env:PYTHONPATH = (Get-Location)
 | [docs/PROJECT_GUIDE.md](docs/PROJECT_GUIDE.md) | 架构、流程、命令 |
 | [docs/DATA_LOCAL.md](docs/DATA_LOCAL.md) | 本地库配置、dump 导出与恢复 |
 | [docs/DUMP_READY.md](docs/DUMP_READY.md) | **线下 dump 单发 / restore** |
-| [docs/TUNING_LOCAL.md](docs/TUNING_LOCAL.md) | Ops 台与 MLflow 启动 |
+| [docs/TUNING_LOCAL.md](docs/TUNING_LOCAL.md) | MLflow 本地查看 |
 | [docs/PARAM_STORY.md](docs/PARAM_STORY.md) | SOFA / 优先级 / λ 参数语义 |
 | [docs/LAMBDA_TUNING.md](docs/LAMBDA_TUNING.md) | λ 调参方法 |
 | [docs/README.md](docs/README.md) | 文档索引 |
@@ -33,7 +33,7 @@ $env:PYTHONPATH = (Get-Location)
 ## 架构
 
 ```
-MIMIC (Layer0) → ETL → SOFA → CP-SAT（滚动） → Streamlit Ops
+MIMIC (Layer0) → ETL → SOFA → CP-SAT（滚动）
 ```
 
 ## Docker（可选）
@@ -46,12 +46,11 @@ docker compose -p icu_scheduling up -d   # PostgreSQL 端口 5434
 脚本端口解析顺序：`-PgPort` > `$env:PG_PORT` > `configs/database.yaml` > `5432`。
 未安装宿主 `psql` / `pg_dump` / `pg_restore` 时，`scripts/*` 自动回退到 `docker exec`（容器名可用 `$env:PG_CONTAINER` 覆盖）。
 
-## 仿真与演示（Plotly Ops）
+## 仿真
 
 ```powershell
 $env:PYTHONPATH = (Get-Location)
 .\.venv\Scripts\python.exe -m application.simulate
-.\scripts\run_console.ps1
 ```
 
-线下 dump：**不入 Git**，见 [`docs/DUMP_READY.md`](docs/DUMP_READY.md)。页面：项目 / 运行 / 验收。默认策略 `cp_sat`（无 MIMIC PPO 轨迹时勿宣称 online RL）。
+线下 dump：**不入 Git**，见 [`docs/DUMP_READY.md`](docs/DUMP_READY.md)。默认策略 `cp_sat`（无 MIMIC PPO 轨迹时勿宣称 online RL）。
