@@ -21,6 +21,11 @@ mlflow.db
 *.log
 *.dump
 
+# Office documents
+*.docx
+~$*.docx
+*.pdf
+
 # IDE / Editor
 .vscode/
 .idea/
