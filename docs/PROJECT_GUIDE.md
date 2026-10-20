@@ -18,6 +18,8 @@ PostgreSQL: icu_scheduling
 | Layer0 数据 | `mimic_iv_demo` 或自建 `mimic` 全量库 |
 | 本地配置 | 从 `configs/*.example` 复制，**勿提交** |
 
+> 脚本端口解析顺序：`-PgPort` > `$env:PG_PORT` > `configs/database.yaml` 里的端口 > `5432`；Docker 用户把 `database.yaml` 的端口写成 `5434` 即可。
+
 ## 推荐流程
 
 ### 1. 初始化

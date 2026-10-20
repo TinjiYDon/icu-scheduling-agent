@@ -35,3 +35,6 @@ include = ["infra*", "data_access*", "domain*", "application*", "presentation*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slow: rewrites staging tables from Layer0/mock (~minutes); run with `pytest -m slow`",
+]

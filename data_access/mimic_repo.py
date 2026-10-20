@@ -31,6 +31,17 @@ def _read_engine() -> Engine:
     return engine
 
 
+def layer0_available() -> bool:
+    """Whether the configured read source exposes a queryable icustays table."""
+    table = "mock.icustays" if get_data_source() == "mock" else "mimiciv_icu.icustays"
+    try:
+        with _read_engine().connect() as conn:
+            conn.execute(text(f"SELECT 1 FROM {table} LIMIT 1"))
+    except Exception:  # noqa: BLE001 - any connection/schema error means "not ready"
+        return False
+    return True
+
+
 def count_icustays() -> int:
     source = get_data_source()
     if source == "mock":

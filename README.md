@@ -43,6 +43,9 @@ MIMIC (Layer0) → ETL → SOFA → CP-SAT（滚动） → Streamlit Ops
 docker compose -p icu_scheduling up -d   # PostgreSQL 端口 5434
 ```
 
+脚本端口解析顺序：`-PgPort` > `$env:PG_PORT` > `configs/database.yaml` > `5432`。
+`psql` / `pg_dump` / `pg_restore` 需在本机 PATH 或 `C:\Program Files\PostgreSQL\16\bin`。
+
 ## 仿真与演示（Plotly Ops）
 
 ```powershell
