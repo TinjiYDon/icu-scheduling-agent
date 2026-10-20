@@ -1,1 +1,1 @@
-"""L3: SOFA, state, CP-SAT, PPO, rolling, simulation."""
+"""L3: SOFA scoring, CP-SAT assignment, rolling simulation."""

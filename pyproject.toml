@@ -1,7 +1,7 @@
 [project]
 name = "icu-scheduling"
 version = "0.1.0"
-description = "ICU resource dynamic scheduling agent (CP-SAT + PPO)"
+description = "ICU resource dynamic scheduling agent (CP-SAT core)"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -12,10 +12,6 @@ dependencies = [
     "pandas>=2.0",
     "numpy>=1.26",
     "ortools>=9.10",
-    "torch>=2.2",
-    "gymnasium>=1.0",
-    "stable-baselines3>=2.4",
-    "sb3-contrib>=2.4",
     "pydantic-settings>=2.0",
     "pyyaml>=6.0",
 ]

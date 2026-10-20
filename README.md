@@ -1,8 +1,24 @@
-# ICU 医疗资源动态调度智能体
+# ICU 医疗资源动态调度智能体 · CP-SAT 核心
 
-独立开源项目 · 3 人协作 · 仓库 [icu-scheduling-agent](https://github.com/TinjiYDon/icu-scheduling-agent)
+独立开源项目 · 仓库 [icu-scheduling-agent](https://github.com/TinjiYDon/icu-scheduling-agent)
 
-**协作入口**：[`CONTRIBUTING.md`](CONTRIBUTING.md)
+保留范围:**L1 基础设施 + L2 数据访问 + L3 CP-SAT(含 SOFA 评分)**。RL/PPO、L4 数据入口、文档与运维脚本已移除。
+
+## 结构
+
+```
+infra/          L1  配置、数据库连接、MLflow
+data_access/    L2  仓储(MIMIC 停留记录 / 分床结果)
+domain/
+  optimizer/    L3  CP-SAT 分床、calib/eval 划分、可解释输出、λ 调参
+  scoring/      L3  SOFA 评分
+  rolling/      L3  滚动时域调度引擎
+  etl/          L3  ETL 流水线(保留库代码,暂无入口)
+application/    L4  simulate / plan / optimize
+configs/        配置模板与优化器参数
+migrations/     PostgreSQL schema
+tests/          CP-SAT / λ / DB 相关测试
+```
 
 ## 快速开始
 
@@ -11,46 +27,38 @@ python -m venv .venv
 .\.venv\Scripts\pip install -e ".[dev]"
 copy configs\database.yaml.example configs\database.yaml
 copy configs\data.yaml.example configs\data.yaml
-.\scripts\apply_migrations.ps1
-$env:PYTHONPATH = (Get-Location)
-.\scripts\run_data_pipeline.ps1   # 数据检查点：ETL + dump + 冒烟
 ```
 
-## 文档
-
-| 文档 | 说明 |
-|------|------|
-| [docs/PROJECT_GUIDE.md](docs/PROJECT_GUIDE.md) | 架构、流程、命令 |
-| [docs/DATA_LOCAL.md](docs/DATA_LOCAL.md) | 本地库配置、dump 导出与恢复 |
-| [docs/DUMP_READY.md](docs/DUMP_READY.md) | **线下 dump 单发 / restore** |
-| [docs/TUNING_LOCAL.md](docs/TUNING_LOCAL.md) | MLflow 本地查看 |
-| [docs/PARAM_STORY.md](docs/PARAM_STORY.md) | SOFA / 优先级 / λ 参数语义 |
-| [docs/LAMBDA_TUNING.md](docs/LAMBDA_TUNING.md) | λ 调参方法 |
-| [docs/README.md](docs/README.md) | 文档索引 |
-
-**边界**：默认 `cp_sat`；预测层用仓内病情参数，**不接** decision 风险分。
-
-## 架构
-
-```
-MIMIC (Layer0) → ETL → SOFA → CP-SAT（滚动）
-```
-
-## Docker（可选）
+数据库(可选 Docker):
 
 ```powershell
-# 仓库路径含中文时 compose 推导不出 project name，需显式指定
 docker compose -p icu_scheduling up -d   # PostgreSQL 端口 5434
 ```
 
-脚本端口解析顺序：`-PgPort` > `$env:PG_PORT` > `configs/database.yaml` > `5432`。
-未安装宿主 `psql` / `pg_dump` / `pg_restore` 时，`scripts/*` 自动回退到 `docker exec`（容器名可用 `$env:PG_CONTAINER` 覆盖）。
+建表(按顺序执行 `migrations/` 下的 SQL,或使用任意迁移工具):
 
-## 仿真
+```powershell
+psql -h localhost -p 5434 -U postgres -d icu_scheduling -f migrations\001_layer1_schemas.sql
+psql -h localhost -p 5434 -U postgres -d icu_scheduling -f migrations\002_staging_icustays.sql
+psql -h localhost -p 5434 -U postgres -d icu_scheduling -f migrations\003_sequence_grants.sql
+```
+
+## 入口
 
 ```powershell
 $env:PYTHONPATH = (Get-Location)
 .\.venv\Scripts\python.exe -m application.simulate
 ```
 
-线下 dump：**不入 Git**，见 [`docs/DUMP_READY.md`](docs/DUMP_READY.md)。默认策略 `cp_sat`（无 MIMIC PPO 轨迹时勿宣称 online RL）。
+| 用途 | 入口 |
+|------|------|
+| 滚动仿真(CLI) | `python -m application.simulate` |
+| 读取分床方案 | `from application.plan import get_plan, run_simulation_with_plan` |
+| 策略入口 | `from application.optimize import optimize` |
+
+## 关键契约
+
+- 评估划分为 **calib / eval**,不是 train/val/test
+- 唯一调度策略:`cp_sat`
+- CP-SAT 只通过 `domain.optimizer.cp_sat.run_assignment()` 进入
+- SQL 只出现在 `data_access/` 与 `migrations/`
