@@ -44,7 +44,7 @@ docker compose -p icu_scheduling up -d   # PostgreSQL 端口 5434
 ```
 
 脚本端口解析顺序：`-PgPort` > `$env:PG_PORT` > `configs/database.yaml` > `5432`。
-`psql` / `pg_dump` / `pg_restore` 需在本机 PATH 或 `C:\Program Files\PostgreSQL\16\bin`。
+未安装宿主 `psql` / `pg_dump` / `pg_restore` 时，`scripts/*` 自动回退到 `docker exec`（容器名可用 `$env:PG_CONTAINER` 覆盖）。
 
 ## 仿真与演示（Plotly Ops）
 

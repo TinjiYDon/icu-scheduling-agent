@@ -8,62 +8,74 @@ param(
     [string]$PgUser = "postgres",
     [string]$PgPassword = "postgres",
     [string]$MimicSource = "mimic",
-    [string]$Phase = "P0"
+    [string]$Phase = "P0",
+    [string]$Database = "icu_scheduling"
 )
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
+. (Join-Path $PSScriptRoot "db_tools.ps1")
+$PgDatabase = $Database
 
-# Port precedence: -PgPort > $env:PG_PORT > configs/database.yaml > 5432
-if ($PgPort -le 0) {
-    if ($env:PG_PORT) {
-        $PgPort = [int]$env:PG_PORT
-    }
-    elseif (Test-Path (Join-Path $root "configs\database.yaml")) {
-        $m = Select-String -Path (Join-Path $root "configs\database.yaml") -Pattern 'localhost:(\d+)' -ErrorAction SilentlyContinue |
-            Select-Object -First 1
-        if ($m) { $PgPort = [int]$m.Matches[0].Groups[1].Value }
-    }
-    if ($PgPort -le 0) { $PgPort = 5432 }
-}
-if (-not $OutDir) { $OutDir = Join-Path $root "dumps" }
+$PgPort = Resolve-PgPort -Port $PgPort -Root $root
+$dumpsDir = Join-Path $root "dumps"
+if (-not $OutDir) { $OutDir = $dumpsDir }
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
-$DbName = "icu_scheduling"
 $Schemas = @("staging", "feat", "sim", "sched", "app")
 
-$pgDump = "pg_dump"
-$psql = "psql"
-if (Test-Path "C:\Program Files\PostgreSQL\16\bin\pg_dump.exe") {
-    $pgDump = "C:\Program Files\PostgreSQL\16\bin\pg_dump.exe"
-    $psql = "C:\Program Files\PostgreSQL\16\bin\psql.exe"
+$pgDump = Get-PgTool -Name "pg_dump"
+if (-not $pgDump) {
+    throw "pg_dump not found (install PostgreSQL client tools) and container '$PgContainer' is not running. Try: docker compose -p icu_scheduling up -d"
 }
+$psql = Get-PgTool -Name "psql"
 
+Write-Host "Target: $(Format-PgTarget -Tool $pgDump -DbHost $PgHost -DbPort $PgPort) (db=$PgDatabase)"
 $env:PGPASSWORD = $PgPassword
 $dateTag = Get-Date -Format "yyyyMMdd"
 $version = Get-Date -Format "yyyyMMdd_HHmm"
 
 $stayCount = 0
-$n = & $psql -h $PgHost -p $PgPort -U $PgUser -d $DbName -t -A -c "SELECT COUNT(*) FROM staging.icustays;" 2>$null
-if ($LASTEXITCODE -eq 0 -and $n) { $stayCount = [int]$n.Trim() }
+if ($psql) {
+    if ($psql.Mode -eq "docker") {
+        $n = & docker exec $PgContainer psql -U postgres -d $PgDatabase -t -A -c "SELECT COUNT(*) FROM staging.icustays;" 2>$null
+    }
+    else {
+        $n = & $psql.Path -h $PgHost -p $PgPort -U $PgUser -d $PgDatabase -t -A -c "SELECT COUNT(*) FROM staging.icustays;" 2>$null
+    }
+    if ($LASTEXITCODE -eq 0 -and $n) { $stayCount = [int](($n | Out-String).Trim()) }
+}
 
 $kind = if ($SchemasOnly) { "etl" } else { "full" }
 if ($stayCount -le 0 -and $SchemasOnly) { $kind = "schema-only" }
-$out = Join-Path $OutDir "${DbName}_${Phase}-${kind}_${MimicSource}_${stayCount}stays_${dateTag}.dump"
+$fileName = "${PgDatabase}_${Phase}-${kind}_${MimicSource}_${stayCount}stays_${dateTag}.dump"
+$out = Join-Path $OutDir $fileName
 
-$pgArgs = @("-h", $PgHost, "-p", "$PgPort", "-U", $PgUser, "-Fc", "-f", $out)
-if ($SchemasOnly) {
-    foreach ($s in $Schemas) { $pgArgs += @("-n", $s) }
+Write-Host "Exporting $PgDatabase -> $out"
+if ($pgDump.Mode -eq "docker") {
+    # Write inside the bind-mounted /dumps first, then move if a custom OutDir was given.
+    $containerOut = "/dumps/$fileName"
+    $pgArgs = @("exec", "-e", "PGOPTIONS=-c client_min_messages=warning", $PgContainer, "pg_dump", "-U", "postgres", "-Fc", "-f", $containerOut)
+    if ($SchemasOnly) { foreach ($s in $Schemas) { $pgArgs += @("-n", $s) } }
+    $pgArgs += $PgDatabase
+    $code = Invoke-Native -FilePath "docker" -Arguments $pgArgs
+    if ($code -ne 0) { throw "pg_dump failed for $PgDatabase (exit $code)" }
+    $produced = Join-Path $dumpsDir $fileName
+    if ((Resolve-Path $OutDir).Path -ne (Resolve-Path $dumpsDir).Path) {
+        Move-Item $produced $out -Force
+    }
 }
-$pgArgs += $DbName
-
-Write-Host "Exporting $DbName -> $out"
-& $pgDump @pgArgs
-if ($LASTEXITCODE -ne 0) { throw "pg_dump failed for $DbName (exit $LASTEXITCODE)" }
+else {
+    $pgArgs = @("-h", $PgHost, "-p", "$PgPort", "-U", $PgUser, "-Fc", "-f", $out)
+    if ($SchemasOnly) { foreach ($s in $Schemas) { $pgArgs += @("-n", $s) } }
+    $pgArgs += $PgDatabase
+    $code = Invoke-Native -FilePath $pgDump.Path -Arguments $pgArgs
+    if ($code -ne 0) { throw "pg_dump failed for $PgDatabase (exit $code)" }
+}
 
 $meta = @{
     version      = $version
-    database     = $DbName
+    database     = $PgDatabase
     phase        = $Phase
     mimic_source = $MimicSource
     stay_count   = $stayCount

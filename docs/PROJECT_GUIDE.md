@@ -18,7 +18,8 @@ PostgreSQL: icu_scheduling
 | Layer0 数据 | `mimic_iv_demo` 或自建 `mimic` 全量库 |
 | 本地配置 | 从 `configs/*.example` 复制，**勿提交** |
 
-> 脚本端口解析顺序：`-PgPort` > `$env:PG_PORT` > `configs/database.yaml` 里的端口 > `5432`；Docker 用户把 `database.yaml` 的端口写成 `5434` 即可。
+> 脚本端口解析顺序：`-PgPort` > `$env:PG_PORT` > `configs/database.yaml` > `5432`；Docker 用户把 `database.yaml` 的端口写成 `5434` 即可。
+> 未安装宿主 `psql` / `pg_dump` / `pg_restore` 时，`scripts/*.ps1` 自动回退到 `docker exec`（容器名可用 `$env:PG_CONTAINER` 覆盖）。
 
 ## 推荐流程
 
@@ -53,7 +54,7 @@ L4：`run_simulation_with_plan()` · `get_plan()` — Ops/Accept 监测台见 [`
 .\scripts\restore_layer1.ps1 -DumpFile .\dumps\icu_scheduling_P0-full_*.dump
 ```
 
-详见 [`DUMP_READY.md`](DUMP_READY.md)。
+宿主没有 `pg_restore` 时自动走 `docker exec`；目标库可用 `-Database` 指定。详见 [`DUMP_READY.md`](DUMP_READY.md)。
 
 ## 命令入口
 

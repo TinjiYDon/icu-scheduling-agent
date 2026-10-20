@@ -2,32 +2,38 @@ param(
     [string]$PgHost = "localhost",
     [int]$PgPort = 0,
     [string]$PgUser = "postgres",
-    [string]$PgPassword = "postgres"
+    [string]$PgPassword = "postgres",
+    [string]$Database = "icu_scheduling"
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
+. (Join-Path $PSScriptRoot "db_tools.ps1")
+$PgDatabase = $Database
 
-# Port precedence: -PgPort > $env:PG_PORT > configs/database.yaml > 5432
-if ($PgPort -le 0) {
-    if ($env:PG_PORT) {
-        $PgPort = [int]$env:PG_PORT
-    }
-    elseif (Test-Path (Join-Path $root "configs\database.yaml")) {
-        $m = Select-String -Path (Join-Path $root "configs\database.yaml") -Pattern 'localhost:(\d+)' -ErrorAction SilentlyContinue |
-            Select-Object -First 1
-        if ($m) { $PgPort = [int]$m.Matches[0].Groups[1].Value }
-    }
-    if ($PgPort -le 0) { $PgPort = 5432 }
+$PgPort = Resolve-PgPort -Port $PgPort -Root $root
+$psql = Get-PgTool -Name "psql"
+if (-not $psql) {
+    throw "psql not found (install PostgreSQL client tools) and container '$PgContainer' is not running. Try: docker compose -p icu_scheduling up -d"
 }
-Write-Host "Target: ${PgHost}:${PgPort} (db=icu_scheduling)"
+Write-Host "Target: $(Format-PgTarget -Tool $psql -DbHost $PgHost -DbPort $PgPort) (db=$PgDatabase)"
 
-$migrations = Join-Path $root "migrations"
-$psql = if (Test-Path "C:\Program Files\PostgreSQL\16\bin\psql.exe") {
-    "C:\Program Files\PostgreSQL\16\bin\psql.exe"
-} else { "psql" }
 $env:PGPASSWORD = $PgPassword
-Get-ChildItem (Join-Path $migrations "*.sql") | Sort-Object Name | ForEach-Object {
+Get-ChildItem (Join-Path $root "migrations\*.sql") | Sort-Object Name | ForEach-Object {
     Write-Host "Applying $($_.Name) ..."
-    & $psql -h $PgHost -p $PgPort -U $PgUser -d icu_scheduling -f $_.FullName
+    if ($psql.Mode -eq "docker") {
+        $tmp = "/tmp/$($_.Name)"
+        $code = Invoke-Native -FilePath "docker" -Arguments @("cp", $_.FullName, "${PgContainer}:$tmp")
+        if ($code -ne 0) { throw "docker cp failed: $($_.Name)" }
+        $code = Invoke-Native -FilePath "docker" -Arguments @(
+            "exec", "-e", "PGOPTIONS=-c client_min_messages=warning", $PgContainer,
+            "psql", "-U", "postgres", "-d", $PgDatabase, "-v", "ON_ERROR_STOP=1", "-q", "-f", $tmp
+        )
+    }
+    else {
+        $code = Invoke-Native -FilePath $psql.Path -Arguments @(
+            "-h", $PgHost, "-p", "$PgPort", "-U", $PgUser, "-d", $PgDatabase, "-v", "ON_ERROR_STOP=1", "-f", $_.FullName
+        )
+    }
+    if ($code -ne 0) { throw "migration failed: $($_.Name) (exit $code)" }
 }
-Write-Host "Applied all migrations to icu_scheduling"
+Write-Host "Applied all migrations to $PgDatabase"

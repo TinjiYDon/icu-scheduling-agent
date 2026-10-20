@@ -1,40 +1,56 @@
 # Restore Layer1 dump into icu_scheduling
-# Usage: .\restore_layer1.ps1 -DumpFile .\dumps\icu_scheduling_P0-etl_*.dump
+# Usage: .\restore_layer1.ps1 -DumpFile .\dumps\icu_scheduling_P0-full_*.dump
+# Runs as a superuser (-PgUser, default postgres); the dump's GRANTs give icu_dev access.
+# Falls back to `docker exec` when host pg_restore is not installed.
 param(
     [Parameter(Mandatory = $true)]
     [string]$DumpFile,
     [string]$PgHost = "localhost",
     [int]$PgPort = 0,
     [string]$PgUser = "postgres",
-    [string]$PgPassword = "postgres"
+    [string]$PgPassword = "postgres",
+    [string]$Database = "icu_scheduling"
 )
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
+. (Join-Path $PSScriptRoot "db_tools.ps1")
+$PgDatabase = $Database
 
-# Port precedence: -PgPort > $env:PG_PORT > configs/database.yaml > 5432
-if ($PgPort -le 0) {
-    if ($env:PG_PORT) {
-        $PgPort = [int]$env:PG_PORT
-    }
-    elseif (Test-Path (Join-Path $root "configs\database.yaml")) {
-        $m = Select-String -Path (Join-Path $root "configs\database.yaml") -Pattern 'localhost:(\d+)' -ErrorAction SilentlyContinue |
-            Select-Object -First 1
-        if ($m) { $PgPort = [int]$m.Matches[0].Groups[1].Value }
-    }
-    if ($PgPort -le 0) { $PgPort = 5432 }
-}
-
+$PgPort = Resolve-PgPort -Port $PgPort -Root $root
 if (-not (Test-Path $DumpFile)) { throw "Dump not found: $DumpFile" }
 
-$db = "icu_scheduling"
-$pgRestore = "pg_restore"
-if (Test-Path "C:\Program Files\PostgreSQL\16\bin\pg_restore.exe") {
-    $pgRestore = "C:\Program Files\PostgreSQL\16\bin\pg_restore.exe"
+$pgRestore = Get-PgTool -Name "pg_restore"
+if (-not $pgRestore) {
+    throw "pg_restore not found (install PostgreSQL client tools) and container '$PgContainer' is not running. Try: docker compose -p icu_scheduling up -d"
 }
+Write-Host "Restoring $DumpFile -> $PgDatabase on $(Format-PgTarget -Tool $pgRestore -DbHost $PgHost -DbPort $PgPort)"
 
 $env:PGPASSWORD = $PgPassword
-Write-Host "Restoring $DumpFile -> $db on ${PgHost}:${PgPort}"
-& $pgRestore -h $PgHost -p $PgPort -U $PgUser -d $db --clean --if-exists --no-owner --role=icu_dev $DumpFile
+if ($pgRestore.Mode -eq "docker") {
+    # dumps/ is bind-mounted at /dumps; other paths are copied into the container.
+    $resolved = (Resolve-Path $DumpFile).Path
+    $dumpsDir = (Join-Path $root "dumps")
+    if ($resolved.StartsWith($dumpsDir, [System.StringComparison]::OrdinalIgnoreCase)) {
+        $rel = $resolved.Substring($dumpsDir.Length).TrimStart([char[]]@('\', '/')).Replace('\', '/')
+        $containerPath = "/dumps/$rel"
+    }
+    else {
+        $containerPath = "/tmp/restore.dump"
+        $copyCode = Invoke-Native -FilePath "docker" -Arguments @("cp", $resolved, "${PgContainer}:$containerPath")
+        if ($copyCode -ne 0) { throw "docker cp failed: $resolved" }
+    }
+    $code = Invoke-Native -FilePath "docker" -Arguments @(
+        "exec", "-e", "PGOPTIONS=-c client_min_messages=warning", $PgContainer,
+        "pg_restore", "-U", "postgres", "-d", $PgDatabase, "--clean", "--if-exists", "--no-owner", $containerPath
+    )
+}
+else {
+    $code = Invoke-Native -FilePath $pgRestore.Path -Arguments @(
+        "-h", $PgHost, "-p", "$PgPort", "-U", $PgUser, "-d", $PgDatabase, "--clean", "--if-exists", "--no-owner", $DumpFile
+    )
+}
+if ($code -ne 0) { throw "pg_restore failed (exit $code)" }
+
 Write-Host "OK. Ensure configs/data.yaml has source: mimic"
-Write-Host "Connection: icu_dev/icu_dev @ ${PgHost}:${PgPort}/$db"
+Write-Host "Connection: icu_dev/icu_dev @ ${PgHost}:${PgPort}/$PgDatabase"
