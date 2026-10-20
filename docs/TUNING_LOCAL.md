@@ -7,7 +7,6 @@
 | Streamlit Ops | CP-SAT + 滚动占用 / 热力 / 可解释 | `.\scripts\run_console.ps1` |
 | MLflow UI | simulate KPI 历史 | `mlflow ui --backend-store-uri sqlite:///./mlflow.db` |
 | dump | 20260802 full | [`DUMP_READY.md`](DUMP_READY.md) |
-| 答辩口播 | [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md) |
 
 ```powershell
 cd d:\project\icu-scheduling-agent
@@ -15,4 +14,4 @@ cd d:\project\icu-scheduling-agent
 # 默认 http://localhost:8502
 ```
 
-勿用裸 `streamlit`（需 venv）。下一步见 [`TOP_TIER_NEXT.md`](TOP_TIER_NEXT.md)。
+勿用裸 `streamlit`（需 venv）。

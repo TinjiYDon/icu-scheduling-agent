@@ -44,7 +44,7 @@ def render_overview() -> None:
 ### 演示路径
 1. **运行**：首次进入自动跑一次 CP-SAT + 滚动仿真 → KPI · 图表 · 可解释报告  
 2. **验收**：查看仿真指标与门禁说明  
-3. 口播步骤见 [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)
+3. 环境与启动见 [`docs/TUNING_LOCAL.md`](docs/TUNING_LOCAL.md)
 """
     )
     disclaimer()

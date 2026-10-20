@@ -2,17 +2,10 @@
 
 | 文档 | 内容 |
 |------|------|
-| [COLLABORATION.md](COLLABORATION.md) | **3 人协作主手册** |
-| [BACKLOG.md](BACKLOG.md) | 垂直切片任务 |
-| [PROJECT_GUIDE.md](PROJECT_GUIDE.md) | 架构与命令 |
-| [DATA_LOCAL.md](DATA_LOCAL.md) | dump / MIMIC |
-| [STATUS.md](STATUS.md) | 进度与仿真 |
-| [PROGRESS.md](PROGRESS.md) | 里程碑完成度（人/AI） |
-| [CHANGELOG.md](CHANGELOG.md) | 本仓变更与 Release |
-| [ROADMAP.md](ROADMAP.md) | 下一版本目标 |
-| [DUMP_READY.md](DUMP_READY.md) | **线下 dump 单发 / restore** |
-| [TUNING_LOCAL.md](TUNING_LOCAL.md) | Ops 台启动 |
-| [TOP_TIER_NEXT.md](TOP_TIER_NEXT.md) | 下一步优化 |
-| [CONTRIBUTING.md](../CONTRIBUTING.md) | PR 规范 |
-
-## 角色：A 数据 · B 算法/优化 · C 应用/集成
+| [PROJECT_GUIDE.md](PROJECT_GUIDE.md) | 架构、分层与完整命令 |
+| [DATA_LOCAL.md](DATA_LOCAL.md) | 本地数据库配置、dump 导出与恢复 |
+| [DUMP_READY.md](DUMP_READY.md) | 线下 dump 单发 / restore 验收 |
+| [TUNING_LOCAL.md](TUNING_LOCAL.md) | Ops 台与 MLflow 本地启动 |
+| [LAMBDA_TUNING.md](LAMBDA_TUNING.md) | λ 归一化与网格搜索 |
+| [PARAM_STORY.md](PARAM_STORY.md) | SOFA / 优先级 / λ 参数语义 |
+| [CONTRIBUTING.md](../CONTRIBUTING.md) | 分层规则与 PR 规范 |

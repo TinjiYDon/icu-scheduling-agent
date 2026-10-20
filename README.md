@@ -2,7 +2,7 @@
 
 独立开源项目 · 3 人协作 · 仓库 [icu-scheduling-agent](https://github.com/TinjiYDon/icu-scheduling-agent)
 
-**协作入口**：[`docs/COLLABORATION.md`](docs/COLLABORATION.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md) · [`docs/BACKLOG.md`](docs/BACKLOG.md)
+**协作入口**：[`CONTRIBUTING.md`](CONTRIBUTING.md)
 
 ## 快速开始
 
@@ -21,24 +21,14 @@ $env:PYTHONPATH = (Get-Location)
 | 文档 | 说明 |
 |------|------|
 | [docs/PROJECT_GUIDE.md](docs/PROJECT_GUIDE.md) | 架构、流程、命令 |
+| [docs/DATA_LOCAL.md](docs/DATA_LOCAL.md) | 本地库配置、dump 导出与恢复 |
 | [docs/DUMP_READY.md](docs/DUMP_READY.md) | **线下 dump 单发 / restore** |
-| [docs/TUNING_LOCAL.md](docs/TUNING_LOCAL.md) | Plotly Ops 台启动 |
-| [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) | **答辩演示口播** |
-| [docs/STATUS.md](docs/STATUS.md) | 当前进度与仿真 |
-| [docs/PROGRESS.md](docs/PROGRESS.md) | 里程碑完成度 |
-| [docs/CHANGELOG.md](docs/CHANGELOG.md) | 本仓变更 / Release |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | 下一版本 |
+| [docs/TUNING_LOCAL.md](docs/TUNING_LOCAL.md) | Ops 台与 MLflow 启动 |
+| [docs/PARAM_STORY.md](docs/PARAM_STORY.md) | SOFA / 优先级 / λ 参数语义 |
+| [docs/LAMBDA_TUNING.md](docs/LAMBDA_TUNING.md) | λ 调参方法 |
 | [docs/README.md](docs/README.md) | 文档索引 |
 
 **边界**：默认 `cp_sat`；预测层用仓内病情参数，**不接** decision 风险分。
-
-## 答辩演示
-
-```powershell
-.\scripts\run_console.ps1
-```
-
-口播步骤见 [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)：项目总览 → 运行（自动仿真 + 可解释）→ 验收。
 
 ## 架构
 
@@ -49,7 +39,8 @@ MIMIC (Layer0) → ETL → SOFA → CP-SAT（滚动） → Streamlit Ops
 ## Docker（可选）
 
 ```powershell
-docker compose up -d   # PostgreSQL 端口 5434
+# 仓库路径含中文时 compose 推导不出 project name，需显式指定
+docker compose -p icu_scheduling up -d   # PostgreSQL 端口 5434
 ```
 
 ## 仿真与演示（Plotly Ops）

@@ -1,25 +1,16 @@
 # icu-scheduling-agent — AGENTS.md
 
-> 资源动态调度 · SOFA + CP-SAT · 成员 C=集成
+> 资源动态调度 · SOFA + CP-SAT
 
 ## 一句话
 
 ICU stays → SOFA/优先级 → CP-SAT 分床 → `sched.assignments` → Streamlit。
 
-## 角色
-
-| 成员 | 职责 |
-|------|------|
-| A | ETL / dump |
-| B | SOFA / CP-SAT /（预研 PPO） |
-| C | L4 `plan` + Streamlit |
-
 ## 先读
 
-1. `docs/ROADMAP_EXEC.md`
+1. `docs/PROJECT_GUIDE.md`
 2. `docs/PARAM_STORY.md`
-3. `docs/STATUS.md`
-4. `docs/DUMP_READY.md` · `docs/TUNING_LOCAL.md` · `docs/PPO_SMOKE.md`
+3. `docs/DUMP_READY.md` · `docs/TUNING_LOCAL.md`
 
 ## 命令
 
@@ -37,8 +28,7 @@ streamlit run presentation/streamlit_app.py
 - 评估：calib/eval（`domain.optimizer.eval_split`）· **不是** train/val/test
 - MCP：`optimize_beds(run_id?)` → 同上（`presentation/mcp_tools.py`）
 - 参数故事：`docs/PARAM_STORY.md`
-- Bugbot：`docs/BUGBOT.md`
-- 默认策略：`cp_sat`；PR #3（lambda+PPO 代码）**已合 main**，但默认未切 PPO；**无 MIMIC 轨迹包**
+- 默认策略：`cp_sat`；PPO 代码在仓内但**未启用**，无 MIMIC 轨迹包
 
 ## 分层
 

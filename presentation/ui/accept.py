@@ -2,15 +2,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import streamlit as st
 from sqlalchemy import text
 
 from infra.db import get_engine
 from presentation.ui.theme import disclaimer
-
-STATUS = Path(__file__).resolve().parents[2] / "docs" / "STATUS.md"
 
 
 def render_accept() -> None:
@@ -58,7 +54,4 @@ def render_accept() -> None:
     else:
         st.caption("No in-session run yet — open Ops and run once.")
 
-    with st.expander("STATUS.md"):
-        if STATUS.exists():
-            st.markdown(STATUS.read_text(encoding="utf-8"))
     disclaimer()
