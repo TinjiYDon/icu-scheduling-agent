@@ -25,6 +25,8 @@ mlflow.db
 *.docx
 ~$*.docx
 *.pdf
+*.xlsx
+~$*.xlsx
 
 # IDE / Editor
 .vscode/

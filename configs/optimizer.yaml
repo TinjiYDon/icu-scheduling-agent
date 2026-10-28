@@ -1,10 +1,11 @@
 lambda:
-  # Written back from 256-combo calib + eval verification (docs/LAMBDA_TUNING.md, 2026-08-02)
+  # Written back from 256-combo calib + eval verification (2026-08-02)
+  occupancy: 2.0
   wait: 0.5
+  move: 0.5
   overload: 0.1
   balance: 0.1
   zone_mismatch: 0.1
-  occupancy: 2.0
 resources:
   n_beds: 20
   n_isolation_beds: 4
@@ -26,6 +27,34 @@ resources:
   - - 17
     - 4
     - NICU
+isolation:
+  # none: no patient requires isolation; ISO beds are ordinary capacity
+  # careunit_keyword: legacy heuristic (ICU unit name -> isolation), baseline only
+  # real: read feat.stay_flags(stay_id, needs_iso)
+  mode: none
+vent:
+  # none: no ventilator requirement (C4 disabled)
+  # pseudo_random: legacy MD5 ~35% (baseline only)
+  # proxy_rule: SOFA >= proxy_sofa_min AND ICU careunit (constructed proxy)
+  # real: read feat.stay_flags(stay_id, needs_vent)
+  # Assumption: any bed can host a ventilator (global count only).
+  mode: none
+  proxy_sofa_min: 5
+priority:
+  # sofa_rule: legacy w = 1 + sofa/10 (baseline, exactly collinear with f0/f2)
+  # composite: w = 1 + sofa_weight*sofa/12 + wait_weight*los_percentile
+  # los_percentile: empirical CDF of elapsed ICU time (MIMIC dates are shifted)
+  mode: composite
+  sofa_weight: 0.6
+  wait_weight: 0.4
+candidates:
+  # top_score: legacy, pool changes with priority weights
+  # fixed_sample: deterministic hash sample (recommended for Pareto/sensitivity)
+  # stratified: SOFA-quantile stratified deterministic sample
+  mode: fixed_sample
+  size: 200
+  seed: 42
+  strata: 4
 rolling:
   step_hours: 2
   # Default turnover; refresh via: python -m application.train_priority --intensity-only

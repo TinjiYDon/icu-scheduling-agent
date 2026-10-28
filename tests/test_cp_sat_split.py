@@ -129,3 +129,30 @@ def test_evaluation_has_business_metrics(fake_db):
     assert 0.0 <= ev["ventilator_utilization"] <= 1.0
     # avg assigned sofa is non-negative
     assert ev["avg_assigned_sofa"] >= 0.0
+
+
+def test_pivot_mode_metadata(fake_db):
+    out = run_assignment(pivot="wait", persist=False)
+    assert out["objective_mode"] == "pivot"
+    assert out["pivot"] == "wait"
+
+
+def test_epsilon_requires_pivot(fake_db):
+    with pytest.raises(ValueError, match="requires an explicit pivot"):
+        run_assignment(epsilon={"overload": 10}, persist=False)
+
+
+def test_epsilon_respects_bound(fake_db):
+    out = run_assignment(pivot="wait", epsilon={"overload": 0}, persist=False)
+    assert out["objective"]["f2_overload_penalty"] <= 0
+
+
+def test_unknown_pivot_rejected(fake_db):
+    with pytest.raises(ValueError, match="unknown pivot"):
+        run_assignment(pivot="bogus", persist=False)
+
+
+def test_active_objectives_subset(fake_db):
+    out = run_assignment(active_objectives=["wait"], persist=False)
+    assert out["objective_mode"] == "weighted_sum"
+    assert out["active_objectives"] == ["wait"]
