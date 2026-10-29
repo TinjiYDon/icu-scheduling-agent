@@ -7,6 +7,12 @@
 
 ICU stays → 仓内 SOFA/GBDT 优先级 → CP-SAT 多目标分床（滚动）→ 可选 PPO 对照 → Streamlit。
 
+## 总目标（叙事 SSOT）
+
+**可审计 · 可对照 · 可滚动** 的 ICU 床位动态调度。  
+全仓内容与创新点如何挂在一条链上：[`docs/MASTER_NARRATIVE.md`](docs/MASTER_NARRATIVE.md)。  
+改功能前先问：加强这三条中的哪一条？
+
 ## 角色
 
 | 成员 | 职责 |
@@ -17,6 +23,7 @@ ICU stays → 仓内 SOFA/GBDT 优先级 → CP-SAT 多目标分床（滚动）�
 
 ## 先读
 
+0. `docs/MASTER_NARRATIVE.md`（**总目标 · 总内容 · 主线**）
 1. `docs/ROADMAP.md`（Wave S-LIT / S0–S3 / S-FLY）
 2. `docs/SOTA_SURVEY.md`（**先对标再创新**；无 LIT 不宣称 SOTA）
 3. `docs/DATA_FLYWHEEL.md`

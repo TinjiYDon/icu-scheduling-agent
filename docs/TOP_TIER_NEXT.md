@@ -20,6 +20,9 @@
 | P1 | eval 六场景表 | ✅ STATUS |
 | P1 | S3 同池多 episode 深化 | ✅ fair stay_ids + resources |
 | P1 | 老师演示清单 | ✅ `DEMO_SCRIPT.md` |
+| P1 | H5 PtO 决策消融 | ✅ `run_pto_ablation` |
+| P1 | H6 滚动对照 | ✅ `run_rolling_contrast` |
+| P1 | 学术够格文档 | ✅ `ACADEMIC_VALUE.md` |
 | P1 | PPO zip 真跑冒烟 | 有 artifacts 时 |
 | P2 | 压力场景 ε 仍不可行时披露 | 持续 |
 
