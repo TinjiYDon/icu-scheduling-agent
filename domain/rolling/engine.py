@@ -21,6 +21,7 @@ def run_rolling_simulation(
     admission_rate: float | None = None,
     *,
     reoptimize: bool = True,
+    persist: bool = True,
 ) -> dict:
     """Simulate ICU scheduling over multiple time steps.
 
@@ -71,7 +72,7 @@ def run_rolling_simulation(
     # ── 1. Initial assignment ─────────────────────────────────────
     from domain.optimizer.cp_sat import run_assignment
 
-    r0 = run_assignment()
+    r0 = run_assignment(persist=persist)
     for a in r0.get("top_assignments", [])[:n_beds]:
         occupied[a["bed_id"]] = {
             "stay_id": a["stay_id"],

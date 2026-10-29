@@ -22,8 +22,8 @@ def run_rolling_contrast(
     n_steps: int = 12,
     output_path: str | Path | None = None,
 ) -> dict[str, Any]:
-    rolling = run_rolling_simulation(n_steps=n_steps, reoptimize=True)
-    static = run_rolling_simulation(n_steps=n_steps, reoptimize=False)
+    rolling = run_rolling_simulation(n_steps=n_steps, reoptimize=True, persist=False)
+    static = run_rolling_simulation(n_steps=n_steps, reoptimize=False, persist=False)
     sum_r = summarize_rolling_run(rolling)
     sum_s = summarize_rolling_run(static)
     report = {
