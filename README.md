@@ -8,6 +8,8 @@
 
 **协作入口**：[`docs/COLLABORATION.md`](docs/COLLABORATION.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md) · [`docs/BACKLOG.md`](docs/BACKLOG.md)
 
+**本次变更交接**：[`README_HANDOFF.md`](README_HANDOFF.md)（部署、复现、验证结果与后续任务）
+
 ## 快速开始
 
 ```powershell
@@ -20,7 +22,23 @@ $env:PYTHONPATH = (Get-Location)
 .\scripts\run_data_pipeline.ps1   # 数据检查点：ETL + dump + 冒烟
 ```
 
-## 文档
+## 测试
+
+普通测试不依赖 PostgreSQL，CI 运行同一套完整单测：
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
+```
+
+真实数据库测试必须显式启用。以下三项只读检查连接、数据和 CP-SAT 可行性：
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests/test_db.py tests/test_cp_sat_quick.py --run-db -q
+```
+
+`tests/test_etl.py::test_etl_smoke` 也属于数据库集成测试，会运行 ETL、写入特征表；仅在准备好相应数据库时单独执行。
+
+## 文档导航
 
 | 文档 | 说明 |
 |------|------|

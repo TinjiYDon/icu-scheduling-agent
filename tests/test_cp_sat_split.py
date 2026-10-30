@@ -163,3 +163,22 @@ def test_balance_uses_configured_bed_zones(fake_db):
     assert objective["zone_capacities"] == [4, 4, 4, 4, 4]
     assert objective["balance_scale"] == 4
     assert len(objective["zone_loads"]) == 5
+
+
+@pytest.mark.parametrize("zone, expected_mismatch", [("CCU", 1), ("MICU", 2)])
+def test_non_isolation_patient_using_iso_bed_counts_zone_mismatch(monkeypatch, zone, expected_mismatch):
+    config = _fake_opt_config()
+    config["resources"].update(
+        n_beds=2, n_isolation_beds=1, bed_zones=[[1, 1, "ISO"], [2, 1, "CCU"]],
+    )
+    rows = [
+        {"stay_id": sid, "priority_weight": 1, "sofa_total": 0, "first_careunit": zone}
+        for sid in (1, 2)
+    ]
+    monkeypatch.setattr("domain.optimizer.cp_sat.load_yaml", lambda _: config)
+    monkeypatch.setattr("domain.optimizer.cp_sat.get_engine", lambda: _FakeEngine(rows))
+    # Override demand rule to isolate the soft zone semantics from ISO heuristics.
+    monkeypatch.setattr("domain.optimizer.cp_sat.needs_isolation", lambda _: False)
+    result = run_assignment(persist=False, objective_mode="lexicographic")
+    assert result["assigned"] == 2
+    assert result["objective"]["f4_zone_mismatch"] == expected_mismatch

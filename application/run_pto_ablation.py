@@ -16,7 +16,11 @@ from domain.ops.pto_decision_ablation import (
     decision_delta,
     pto_takeaways,
 )
-from domain.scoring.predict_priority import _careunit_code, _fit_gbdt, _load_training_frame
+from domain.scoring.predict_priority import (
+    _careunit_code,
+    _fit_gbdt,
+    _load_training_frame,
+)
 from infra.config import load_yaml
 from infra.db import get_engine
 
@@ -92,7 +96,9 @@ def run_pto_ablation(
         else (opt.get("ppo") or {}).get("candidate_patients", 40)
     )
 
-    env0 = build_icu_env()
+    if n_cand < 1:
+        raise ValueError("candidate_patients must be positive")
+    env0 = build_icu_env(candidate_patients=n_cand)
     stay_ids = stay_ids_from_env(env0)[:n_cand]
     if not stay_ids:
         raise RuntimeError("empty stay pool — restore Layer1 dump first")

@@ -6,8 +6,9 @@ zero-based index; the last action means that the patient keeps waiting.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Mapping, Sequence
+from typing import ClassVar
 
 import gymnasium as gym
 import numpy as np
@@ -50,7 +51,7 @@ class ICUEnv(gym.Env):
       then progress and current utilization (2 values).
     """
 
-    metadata = {"render_modes": []}
+    metadata: ClassVar[dict] = {"render_modes": []}
 
     def __init__(
         self,
@@ -175,11 +176,13 @@ class ICUEnv(gym.Env):
             components["priority"] = (
                 self.reward_weights["wait"] * patient.priority_weight
             )
-            if patient.sofa_total >= 10 and not (bed.is_isolation or bed.has_ventilator):
+            if patient.sofa_total >= 10 and not bed.is_isolation:
                 components["overload"] = -self.reward_weights["overload"] * (
                     patient.sofa_total / 24.0
                 )
-            if patient.preferred_zone not in ("", "UNK", bed.zone):
+            if patient.preferred_zone not in ("", "UNK", bed.zone) and not (
+                patient.needs_isolation and bed.is_isolation
+            ):
                 components["zone_mismatch"] = -self.reward_weights["zone_mismatch"]
             components["balance"] = (
                 -self.reward_weights["balance"] * self._balance_deviation()
@@ -203,7 +206,7 @@ class ICUEnv(gym.Env):
     def _bed_is_valid(self, patient: Patient, bed: Bed, index: int) -> bool:
         if self._occupants[index] is not None:
             return False
-        if patient.needs_isolation != bed.is_isolation:
+        if patient.needs_isolation and not bed.is_isolation:
             return False
         if patient.needs_ventilator:
             if not bed.has_ventilator:

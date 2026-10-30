@@ -11,6 +11,7 @@ dependencies = [
     "polars>=1.0",
     "pandas>=2.0",
     "numpy>=1.26",
+    "scikit-learn>=1.4",
     "ortools>=9.10",
     "torch>=2.2",
     "gymnasium>=1.0",
@@ -35,3 +36,4 @@ include = ["infra*", "data_access*", "domain*", "application*", "presentation*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["integration: requires the configured local PostgreSQL database (opt in with --run-db)"]

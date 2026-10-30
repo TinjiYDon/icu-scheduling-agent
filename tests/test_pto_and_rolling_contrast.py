@@ -63,3 +63,20 @@ def test_rolling_contrast_summary():
         },
     )
     assert any("H6" in n for n in notes)
+
+
+def test_rolling_contrast_reuses_identical_initial_allocation(monkeypatch, tmp_path):
+    from application import run_rolling_contrast as usecase
+
+    calls = []
+    initial = [{"stay_id": 1, "bed_id": 2}]
+
+    def simulate(**kwargs):
+        calls.append(kwargs)
+        return {"history": [{"assignments": initial}], "reoptimize": kwargs["reoptimize"]}
+
+    monkeypatch.setattr(usecase, "run_rolling_simulation", simulate)
+    report = usecase.run_rolling_contrast(n_steps=2, output_path=tmp_path / "contrast.json")
+    assert calls[1]["initial_assignments"] == initial
+    assert calls[0]["persist"] is calls[1]["persist"] is False
+    assert report["shared_initial_assignments"] is True

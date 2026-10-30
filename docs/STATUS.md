@@ -1,12 +1,30 @@
 # 项目状态
 
-> 更新：2026-10-09 · **独立调度** · **S2-MOO 1–5** + Fair H3 + bake-off + **H5/H6** · 默认 CP-SAT  
+> 更新：2026-10-30 · 本次核验见下节，后文保留注明日期的历史实验 · 默认 CP-SAT
 > **总目标主线**：[MASTER_NARRATIVE.md](MASTER_NARRATIVE.md)（可审计 · 可对照 · 可滚动）  
 > **叙事**：仓内 SOFA/GBDT；**不**读 decision 风险分；有轨迹包仍**不**宣称 online MIMIC-PPO  
 > 老师大白话：[TEACHER_PLAIN.md](TEACHER_PLAIN.md) · 创新口径：[TEACHER_INNOVATION.md](TEACHER_INNOVATION.md)  
 > 方向：[TEAM_DIRECTION.md](TEAM_DIRECTION.md) · 整合：[INTEGRATION_PREP.md](INTEGRATION_PREP.md) · [S2_MULTI_OBJECTIVE.md](S2_MULTI_OBJECTIVE.md)
 
-## 数据
+## 本次修复与实测（2026-10-30）
+
+| 项目 | 本次结果 |
+|------|----------|
+| PostgreSQL / MIMIC 特征 | 本机 `icu_scheduling` 只读查询成功；staging / SOFA / priority 各 94,458 行 |
+| 自动测试 | 完整无 DB 测试 217 passed、6 skipped；其中 4 项 DB 测试显式 opt-in，2 项 Windows 符号链接测试因系统权限跳过；另 3 项只读 DB 集成测试 passed |
+| 现有 PPO 检查点 | 加载原 zip 进行同池同资源评估成功；20 人单轮三策略 assigned 均为 5、约束违反均为 0 |
+| 多 episode 对照 | 3 episodes，20 人/episode、200 人候选池；PPO / Greedy / CP-SAT mean assigned 均为 5，mean high_risk_wait 均为 15，约束违反均为 0 |
+| H5 决策消融 | 确实使用 40 人；SOFA-only vs 公式 Jaccard=0.1111，GBDT vs 公式=1.0；三种优先级均分配 5 人 |
+| H6 滚动对照 | 共享初始分配，默认保留在院患者；最终 8 步复验两种策略均为 18 床，均 SOFA=10.0667、权重=2.0056、无约束违反与求解失败；本设定打平 |
+| Pareto 阶段 3 | 最终 calib：27 个 ε 网格点、17 个可行点、3 个非支配解，HV=0.052130；本次 payoff 的 balance 轴仅有一个值，去重后不是 81 点。WS / Lex 基线均 OPTIMAL；旧结果保留历史 |
+| 六场景 eval | WS / Lex / ε 共 18 项均 OPTIMAL；`reports/moo/scenarios_latest.json` 已重新生成 |
+| S2-TRAJ | 协议 2.0 真跑导出 4 transitions；前后状态连续、每步人数守恒、约束检查结果均为无违反 |
+
+本次修复覆盖测试收集时连接 DB、滚动患者丢失与计数、零周转率、贪心硬约束、求解失败回退、实验候选规模截断、PPO 与 CP-SAT 可行域差异、GBDT 缺失依赖，以及轨迹导出写库和语义问题。详见 [LOCAL_VALIDATION_20261030.md](LOCAL_VALIDATION_20261030.md)。
+
+以下日期较早的表格是历史记录，尤其旧 H6 的贪心未完整执行资源约束，不能与修复后数据混用。现有 PPO 复验、滚动仿真轨迹和 MIMIC 特征可用，不等于已有真实床旁事件轨迹、固定数据 offline RL 训练或与训练集互斥的独立临床验证。
+
+## 数据（历史记录）
 
 | 项 | 状态 |
 |----|------|
@@ -52,7 +70,7 @@
 | MLflow | `mlflow ui --backend-store-uri sqlite:///./mlflow.db` |
 | 说明 | [`TUNING_LOCAL.md`](TUNING_LOCAL.md) |
 | S2-MOO | ✅ 阶段1–4 实验 + **阶段5 Streamlit「多目标」页** · 六场景 WS/Lex 均 OPTIMAL · 见下表 · [`S2_MULTI_OBJECTIVE.md`](S2_MULTI_OBJECTIVE.md) · [`TEACHER_INNOVATION.md`](TEACHER_INNOVATION.md) · `reports/moo/` |
-| S2-TRAJ | ✅ 协议 1.0 导出验收 · `export_trajectory --steps 4` + schema 单测 · 见 [`TRAJECTORY_PROTOCOL.md`](TRAJECTORY_PROTOCOL.md) |
+| S2-TRAJ | 协议 1.0 为历史验收；当前协议 2.0 已于 2026-10-30 真跑 4 步并验证，见 [`TRAJECTORY_PROTOCOL.md`](TRAJECTORY_PROTOCOL.md) |
 | PPO smoke | [`PPO_SMOKE.md`](PPO_SMOKE.md) · 代码在 main · **默认 cp_sat** · 离线轨迹≠ online |
 | H3 对照表 | ✅ **Fair 同池+同资源**：stay_ids + beds + isolation/vent/zones · PPO/贪心/CP-SAT assigned 均为 **4**（rate=0.20）· L4 `application.h3_ui` · Streamlit「对照」 |
 | S3 深化 | ✅ 多 episode fair benchmark · `python -m application.evaluate_ppo_benchmark --episodes 3` → `reports/ppo_benchmark.json` · 对照页「多 episode 深化」· 仍禁 online 宣称 |
@@ -110,7 +128,9 @@ WS / Lex / ε mid **六场景均可解**（重标定后）。
 
 > 本池四人打平：说明小池启发式已够用，**不**据此宣称 CP/RL 更优；证据点是「同池可复现对照」，不是「某一方法碾压」。
 
-## H5 PtO 决策消融（同池 40 · 2026-10-09）
+## H5 PtO 决策消融（历史命令标注 40 · 2026-10-09）
+
+> 2026-10-30 发现旧入口会被默认 20 人环境截断，故旧记录的实际候选规模不能由命令参数证明。当前已修复，并按上表重新运行真实 40 人实验。
 
 > `python -m application.run_pto_ablation --candidate-patients 40`
 
@@ -123,6 +143,8 @@ WS / Lex / ε mid **六场景均可解**（重标定后）。
 > **关键证据**：SOFA-only 与公式的分配集合 Jaccard≈0.11 → 预测层差异已传导到分床，不是只刷相关分。
 
 ## H6 滚动对照（8 步 · 2026-10-09）
+
+> 仅保留历史；下表基于修复前的队列/计数与贪心约束实现，不用作当前方法优劣证据。2026-10-30 修复版结果见本页顶部。
 
 > `python -m application.run_rolling_contrast --steps 8`
 

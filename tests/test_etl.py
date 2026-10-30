@@ -1,3 +1,7 @@
+import pytest
+
+
+@pytest.mark.integration
 def test_etl_smoke():
     from application.etl_pipeline import run_etl
     from infra.config import get_data_source

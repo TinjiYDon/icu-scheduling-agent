@@ -1,10 +1,11 @@
 # 创新路线
 
 > 本仓库独立演进；MCP 仅作为对外标准接口，不与其他 ICU 项目耦合。
+> 核对：2026-10-30。里程碑勾选表示工程交付或历史验收，研究假设、稳健性与临床有效性仍须各自证据。
 
 ## 目标（实时落地）
 
-**可解释资源动态调度**：当前 SOFA/占用状态 → CP-SAT → **滚动时域**再求解（每步用最新床旁状态）。
+**可解释资源动态调度**：当前 SOFA/占用状态 → CP-SAT → **滚动时域**再求解（当前实现使用 MIMIC 特征与仿真状态；真实床旁事件接入未交付）。
 
 这与 decision 的「早期预警」同属 ICU **实时决策**族，代码零耦合。
 
@@ -15,15 +16,18 @@
 | **P0** ✓ | Demo 跑通 | ETL + SOFA + CP-SAT |
 | **P1** ✓ | 可解释 Demo | Streamlit + 约束说明 |
 | **P2** ✓ | 标准接口 | MCP `optimize_beds` |
-| **实时主线** ✓ | 滚动仿真 | `domain/rolling` + `application.simulate` |
-| **P3** | 学习型策略 | PPO 代码在 main；**默认 cp_sat**；无轨迹不宣称 online |
+| **实时主线** ✓ | 滚动仿真 | 最终 H6 共享初态且保留在院患者，8 步 18/18 打平、均无违约；留院/错配边界回归通过 |
+| **P3** | 学习型策略 | 现有检查点单轮及 3 episode fair benchmark ✅ 2026-10-30；协议 2.0 真跑 4 transitions；**默认 cp_sat** |
 
 ## 评测
 
-calib/eval 划分；simulate 滚动指标入 STATUS。禁止在无 MIMIC 轨迹时宣称 online PPO 已交付。
+calib/eval 划分；2026-10-09 与 2026-10-30 共享初始分配版 H6 分别记录，旧数字不替换为无版本的新结果。轨迹协议 2.0 的真实 4 步 JSON 已核对连续性、人数守恒和约束检查；仿真轨迹、仿真内 PPO 训练和离线评估均不能证明临床 online RL 或固定数据 offline RL 已交付。已有多目标/H5/H6/H7 代码与小规模结果也不等于假设已充分验证。
 
 ## 当前重点
 
 1. Streamlit：CP-SAT + 滚动占用时间线 + 验收门禁（已增强）
-2. 预警风险耦合进 `priority_weight`（配置开关；见 `docs/TOP_TIER_NEXT.md`）
-3. MIMIC `sim` 轨迹仍可选；默认 `policy.default=cp_sat`
+2. 最终验收已回填：PPO 单轮/3 episode、轨迹 2.0、40 人 bake-off/H5、共享初态版 H6、eval 六场景 18 个 OPTIMAL 及阶段 3 27/17/3/HV=0.052130；pytest 217 passed / 6 skipped，另只读 DB 3 passed。留院保留与 CP/RL 错配语义修复已通过回归，详见 [ROADMAP_EXEC.md](ROADMAP_EXEC.md)
+3. 核心研究缺口：逐患者临床时间顺序状态、独立留出与多种子科学验证；真实床旁轨迹及固定数据 offline RL 算法尚未实现。`train_ppo` 是仿真交互训练，不消费导出包
+4. 继续保持 `policy.default=cp_sat`；PPO 仅作离线仿真对照，轨迹包不入 Git；`hybrid` 保留为非必做扩展
+
+**明确非目标：** 不把外部预警或 decision 项目的 `risk_score` 耦合进 `priority_weight`。这与本项目的独立调度边界一致。

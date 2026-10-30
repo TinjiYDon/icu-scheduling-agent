@@ -54,7 +54,9 @@ def run_method_bakeoff(
     )
 
     # Build one env to freeze the fair pool (same stays + bed layout).
-    env0 = build_icu_env()
+    if n_cand < 1:
+        raise ValueError("candidate_patients must be positive")
+    env0 = build_icu_env(candidate_patients=n_cand)
     # Prefer explicit stay list from env; truncate to candidate size for greedy parity.
     stay_ids = stay_ids_from_env(env0)[:n_cand]
     if not stay_ids:

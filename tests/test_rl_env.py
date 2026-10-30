@@ -92,6 +92,32 @@ def test_global_ventilator_capacity_masks_later_patients():
     assert info["action_mask"].tolist() == [False, False, True]
 
 
+def test_non_isolation_patient_can_use_free_isolation_bed_like_cp_sat():
+    env = ICUEnv(patients=[Patient(1, 1)], beds=[Bed(1, "ISO", is_isolation=True)])
+    _, info = env.reset()
+    assert info["action_mask"].tolist() == [True, True]
+    env.step(0)
+    assert len(env.assignments) == 1
+
+
+def test_portable_ventilator_does_not_remove_regular_bed_acuity_mismatch():
+    env = ICUEnv(
+        patients=[Patient(1, 1, sofa_total=12)],
+        beds=[Bed(1, has_ventilator=True)],
+        reward_weights={"overload": 2},
+    )
+    env.reset()
+    _, _, _, _, info = env.step(0)
+    assert info["reward_components"]["overload"] == -1.0
+
+
+def test_isolation_patient_in_isolation_bed_has_no_zone_mismatch():
+    env = _environment()
+    env.reset()
+    _, _, _, _, info = env.step(0)
+    assert info["reward_components"]["zone_mismatch"] == 0
+
+
 def test_training_episode_sampling_is_seeded_and_fixed_size():
     pool = [Patient(stay_id=index, priority_weight=1.0) for index in range(10)]
     env = ICUEnv(

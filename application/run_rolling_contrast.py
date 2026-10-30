@@ -23,19 +23,24 @@ def run_rolling_contrast(
     output_path: str | Path | None = None,
 ) -> dict[str, Any]:
     rolling = run_rolling_simulation(n_steps=n_steps, reoptimize=True, persist=False)
-    static = run_rolling_simulation(n_steps=n_steps, reoptimize=False, persist=False)
+    initial = rolling["history"][0]["assignments"]
+    static = run_rolling_simulation(
+        n_steps=n_steps, reoptimize=False, persist=False, initial_assignments=initial,
+    )
     sum_r = summarize_rolling_run(rolling)
     sum_s = summarize_rolling_run(static)
     report = {
         "status": "ok",
         "hypothesis": "H6",
         "n_steps": n_steps,
+        "shared_initial_assignments": True,
         "rolling_reoptimize": sum_r,
         "greedy_admit_only": sum_s,
         "takeaways": rolling_contrast_takeaways(sum_r, sum_s),
         "note": (
-            "Same discharge/admission RNG schedule; only differ on per-step "
-            "CP-SAT reoptimize. Offline simulation — not a clinical trial."
+            "Same initial allocation, seeded turnover rule and admission limit; both policies respect "
+            "isolation and ventilator constraints. Discharged patient identities may "
+            "differ after policy states diverge. Offline simulation, not a clinical trial."
         ),
     }
     out = Path(output_path) if output_path else OUT_DEFAULT

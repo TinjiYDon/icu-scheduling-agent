@@ -148,6 +148,8 @@ def run_assignment(
     split: str | None = None,
     stay_ids: list[int] | None = None,
     occupied_beds: Mapping[int, int] | None = None,
+    max_new_admissions: int | None = None,
+    retain_occupied: bool = False,
     objective_mode: str = "weighted_sum",
     objective_order: Sequence[str] | None = None,
     epsilon_primary: str = "wait",
@@ -169,6 +171,10 @@ def run_assignment(
         occupied_beds: optional mapping stay_id → current bed_id for patients
             already admitted. Assigning such a patient to a different bed adds
             a move penalty (f5) so re-optimization keeps patients stable.
+        max_new_admissions: optional per-step limit for patients outside
+            occupied_beds, so rolling re-optimization respects arrival volume.
+        retain_occupied: require current inpatients to remain assigned. Rolling
+            simulation enables this; snapshot comparisons keep the old default.
         objective_mode: ``weighted_sum`` (default), ``lexicographic``,
             ``epsilon_constraint``, or ``clinical_cascade`` (H7 RFCC).
         objective_order: priority order for lexicographic optimization.
@@ -181,12 +187,21 @@ def run_assignment(
     """
     if split is not None and split not in ("calib", "eval"):
         raise ValueError("split must be 'calib', 'eval' or None")
+    if max_new_admissions is not None and (
+        isinstance(max_new_admissions, bool)
+        or not isinstance(max_new_admissions, int)
+        or max_new_admissions < 0
+    ):
+        raise ValueError("max_new_admissions must be a non-negative integer")
     opt = load_yaml("optimizer.yaml")
     lam = _resolve_lambda_weights(opt.get("lambda", {}), lambda_weights)
     resources = dict(opt.get("resources") or {})
     if resource_overrides:
         resources.update(dict(resource_overrides))
     n_beds = int(resources.get("n_beds", 20))
+    current_ids = set(occupied_beds or {})
+    if retain_occupied and stay_ids is not None and not current_ids.issubset(stay_ids):
+        raise ValueError("retain_occupied requires all current patients in the candidate pool")
     solver_time = float(
         max_time_seconds
         if max_time_seconds is not None
@@ -234,7 +249,7 @@ def run_assignment(
     n_iso_beds = min(n_iso_beds, n_beds)
     # Build bed_id → zone_label lookup (bed_id is 1-indexed), clipped to n_beds
     # so n_beds can be tuned freely without KeyError on zone bounds.
-    bed_zone_label, bed_zone_start, bed_zone_count = _resolve_bed_zones(
+    bed_zone_label, _, _ = _resolve_bed_zones(
         n_beds, bed_zones_cfg
     )
     run_id = run_id or f"p0_{uuid.uuid4().hex[:8]}"
@@ -305,6 +320,8 @@ def run_assignment(
         }
 
     n = len(stays)
+    if retain_occupied and not current_ids.issubset({s["stay_id"] for s in stays}):
+        raise ValueError("retain_occupied requires all current patients in the loaded candidates")
     if n == 0:
         return {
             "run_id": run_id,
@@ -358,6 +375,14 @@ def run_assignment(
         model.Add(sum(x[i, b] for i in range(n)) <= 1)
     for i in range(n):
         model.Add(sum(x[i, b] for b in range(n_beds)) <= 1)
+        if retain_occupied and stays[i]["stay_id"] in current_ids:
+            model.Add(sum(x[i, b] for b in range(n_beds)) == 1)
+
+    if max_new_admissions is not None:
+        model.Add(
+            sum(x[i, b] for i in range(n) if stays[i]["stay_id"] not in current_ids
+                for b in range(n_beds)) <= max_new_admissions
+        )
 
     # Isolation patients must use isolation beds (first n_iso_beds).
     # Non-isolation patients may use any bed (including free isolation beds),
@@ -451,19 +476,12 @@ def run_assignment(
         if pz <= 0:
             continue
         pref_label = _zone_label(pz)
-        pref_start = bed_zone_start.get(pref_label)
-        pref_count = bed_zone_count.get(pref_label, 0)
-        if pref_start is None or pref_label == "ISO":
-            continue
-
-        in_pref_zone = sum(x[i, b - 1] for b in range(pref_start, pref_start + pref_count))
-        assigned_anywhere = sum(x[i, b] for b in range(n_beds))
-        in_iso = sum(x[i, b] for b in range(n_iso_beds))
-
-        # Mismatch only if: assigned somewhere AND NOT in pref zone AND NOT in ISO
-        mismatch = model.NewIntVar(0, 1, f"mismatch_{i}")
-        model.Add(mismatch >= assigned_anywhere - in_pref_zone - in_iso)
-        mismatch_terms.append(mismatch)
+        mismatch_terms.extend(
+            x[i, b - 1]
+            for b in range(1, n_beds + 1)
+            if bed_zone_label.get(b, "REG") != pref_label
+            and not (iso_flags[i] and b <= n_iso_beds)
+        )
 
     if mismatch_terms:
         model.Add(zone_mismatch_penalty == sum(mismatch_terms))

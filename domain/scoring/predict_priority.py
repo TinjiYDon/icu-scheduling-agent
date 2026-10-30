@@ -44,6 +44,12 @@ def _fit_gbdt(X: np.ndarray, y: np.ndarray):
     try:
         import lightgbm as lgb
 
+    except ImportError:
+        from sklearn.ensemble import GradientBoostingRegressor
+
+        model = GradientBoostingRegressor(random_state=42)
+        backend = "sklearn_gbr"
+    else:
         model = lgb.LGBMRegressor(
             n_estimators=80,
             learning_rate=0.08,
@@ -53,14 +59,9 @@ def _fit_gbdt(X: np.ndarray, y: np.ndarray):
             colsample_bytree=0.9,
             random_state=42,
         )
-        model.fit(X, y)
-        return ("lightgbm", model)
-    except Exception:
-        from sklearn.ensemble import GradientBoostingRegressor
-
-        model = GradientBoostingRegressor(random_state=42)
-        model.fit(X, y)
-        return ("sklearn_gbr", model)
+        backend = "lightgbm"
+    model.fit(X, y)
+    return (backend, model)
 
 
 def build_priority_from_gbdt(*, use_los_feature: bool = True) -> dict:

@@ -11,6 +11,7 @@ def build_icu_env(
     *,
     training: bool = False,
     n_beds: int | None = None,
+    candidate_patients: int | None = None,
     candidate_stay_ids: list[int] | None = None,
 ) -> ICUEnv:
     config = load_yaml("optimizer.yaml")
@@ -19,8 +20,10 @@ def build_icu_env(
     episode_size = (
         len(candidate_stay_ids)
         if candidate_stay_ids is not None
-        else int(ppo.get("candidate_patients", 20))
+        else int(candidate_patients if candidate_patients is not None else ppo.get("candidate_patients", 20))
     )
+    if episode_size < 0:
+        raise ValueError("candidate_patients must be non-negative")
     pool_size = int(ppo.get("training_pool_patients", 200)) if training else episode_size
     # PPO checkpoint is tied to observation dim = 7+4*n_beds+2 (trained at 20).
     beds_n = int(n_beds if n_beds is not None else ppo.get("inference_n_beds", 20))

@@ -4,6 +4,8 @@
 
 | 文档 | 内容 |
 |------|------|
+| [README_HANDOFF.md](../README_HANDOFF.md) | 本次功能分支交接：部署、实验复现、验证与后续任务 |
+| [LOCAL_VALIDATION_20261030.md](LOCAL_VALIDATION_20261030.md) | 本次代码修复与真实数据复验记录 |
 | [MASTER_NARRATIVE.md](MASTER_NARRATIVE.md) | **总目标 / 总内容 / H1–H6 挂点** |
 | [REPORT_SPEECH.md](REPORT_SPEECH.md) | 报告词（结构版） |
 | [REPORT_SPEECH_FULL.md](REPORT_SPEECH_FULL.md) | 完整报告词（全讲版） |
