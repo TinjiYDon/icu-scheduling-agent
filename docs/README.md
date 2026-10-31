@@ -27,6 +27,8 @@
 | [TOP_TIER_NEXT.md](TOP_TIER_NEXT.md) | 下一步优化 |
 | [PARETO_DECISION.md](PARETO_DECISION.md) | **H10 Pareto 决策层：VoF / MMR / HV–churn** |
 | [HV_CHURN.md](HV_CHURN.md) | **H10 前沿适配 + 滚动 HV–churn 序列** |
+| [INNOVATION_PORTFOLIO.md](INNOVATION_PORTFOLIO.md) | **创新点集合（全部创新点 + 可主张性）** |
+| [TECH_REPORT_H10.md](TECH_REPORT_H10.md) | **H10 技术文档（函数/公式/架构/方法论）** |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | PR 规范 |
 
 ## 角色：A 数据 · B 算法/优化 · C 应用/集成
