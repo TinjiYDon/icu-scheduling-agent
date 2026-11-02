@@ -70,7 +70,7 @@ MIMIC Layer0 (mimiciv_hosp/mimiciv_icu)
 |---|---|---|---|---|
 | S-A1 | 语义可用性契约（DAC） | 已实现 | raw→refuse(3 违规)/repaired→pass；refusal_accuracy=1.0 | 强（主线） |
 | S-A2 | FD 压测 | 已实现 | spurious_DoF 3→0 | 强（配套） |
-| S-A3 | 同池反事实 B_pool | 已实现 | 合成 B_pool=0.130；H5/H6/H7 口径自检 | 强（评测方法论） |
+| S-A3 | 同池反事实 B_pool | 已实现 | 合成 B_pool=0.130；真实库 6 场景×5 seed：资源场景 B_pool=0（共享池），仅 small_pool 出现 −0.004864 | 强（评测方法论） |
 | S-B | 数据可用性诊断（三条实证发现） | 已验证 | 隔离 76,157/94,458；priority corr=1.0；los 单位错 | 强（证据底座） |
 | S-C | Pareto 决策层（VoF/CoM/MMR + HV–churn） | 已实现 | HV 0.4834/VoF 0.2418/CoM 0.5394 | 中（依赖前沿质量） |
 | — | RFCC/CARE、PPO、四机理、"Pareto 排序" | 负结果/基线 | 五法同值 −0.0965 | 不主张 |
@@ -96,7 +96,7 @@ MIMIC Layer0 (mimiciv_hosp/mimiciv_icu)
 
 - **问题**：改目标/滤波器会改写候选池，方法对比不可信。
 - **做法**：`B_pool = Δ_naive − Δ_match`；`decompose` 拆成 pool/mechanism/interaction；`summarize_pool_effect` 汇总。
-- **证据**：合成例 0.130；现有 H5/H6/H7 报告 B_pool=0（共享池，池效应未分离——口径自检）。
+- **证据**：合成例 0.130；真实库（MIMIC）6 场景 × 5 seed：`more_beds/fewer_vents/more_iso/high_acuity` 的 B_pool=0（与 baseline 共享池，资源覆盖不改变候选池），只有 `small_pool`（池截断 50）出现 B_pool=−0.004864（matched baseline 重跑在同池上）——**池效应只随池变化出现**，这正是“同池必要但不充分”的直接实证。
 
 ### S-B 三条实证发现（数据底座）
 
@@ -149,7 +149,18 @@ MIMIC Layer0 (mimiciv_hosp/mimiciv_icu)
    - `tests/test_{data_contract,fd_stress,pool_effect,aigc_grid}.py`
    - `docs/AIGC_CONTRACT.md`
 3. **测试矩阵**：no-DB 回归 **91 passed**；CI（`.github/workflows/ci.yml`）跑 8 个文件。
-4. **MIMIC 网格**：`scripts/aigc_mimic_grid.py --source db --levels 3 --seeds 5`（6 场景 × 5 seed；F1 已确认后运行）。
+4. **MIMIC 网格**：`scripts/aigc_mimic_grid.py --source db --levels 3 --seeds 5`（6 场景 × 5 seed；F1 已确认后运行）——**已跑完**，结果：
+
+| 场景 | hv_mean | care_mean | n_feasible | n_front |
+|---|---:|---:|---:|---:|
+| baseline | 0.009384 | 6.125 | 34 | 8 |
+| more_beds | 0.005226 | 7.143 | 26 | 7 |
+| fewer_vents | 0.005508 | 5.500 | 23 | 8 |
+| more_iso | 0.006369 | 8.025 | 34 | 8 |
+| small_pool | 0.004520 | 2.800 | 32 | 5 |
+| high_acuity | 0.009384 | 6.125 | 34 | 8 |
+
+> 口径：真实库中隔离启发式几乎把 200 候选池压缩到 4 张 ISO 床能容纳的量（assigned≈6–8），HV 整体偏小；这本身就是数据可用性问题的实证。`reports/aigc/mimic_grid.json`。
 
 ---
 
