@@ -84,7 +84,12 @@ def run_rolling_simulation(
         # Remove assigned from queue
         queue = [p for p in queue if p["stay_id"] != a["stay_id"]]
 
-    history.append(_snapshot(0, occupied, 0, 0))
+    history.append(
+        _snapshot(
+            0, occupied, 0, 0,
+            candidate_ids=[occ["stay_id"] for occ in occupied.values()],
+        )
+    )
 
     # ── 2. Rolling steps ──────────────────────────────────────────
     total_discharges = 0
@@ -127,6 +132,7 @@ def run_rolling_simulation(
             total_admissions += newly_admitted
 
         # 2c. Re-optimize with CP-SAT every step (optional; H6 baseline skips)
+        candidate_ids: list[int] = []
         if reoptimize:
             candidate_ids = [occ["stay_id"] for occ in occupied.values()]
             candidate_ids += [p["stay_id"] for p in queue[:max_patients(n_beds)]]
@@ -163,7 +169,13 @@ def run_rolling_simulation(
 
         # 2d. Record snapshot
         history.append(
-            _snapshot(step, occupied, newly_admitted, n_discharge)
+            _snapshot(
+                step,
+                occupied,
+                newly_admitted,
+                n_discharge,
+                candidate_ids=candidate_ids or [occ["stay_id"] for occ in occupied.values()],
+            )
         )
 
     # ── 3. Summary ────────────────────────────────────────────────
@@ -182,9 +194,18 @@ def run_rolling_simulation(
 
 
 def _snapshot(
-    step: int, occupied: dict, admitted: int, discharged: int
+    step: int,
+    occupied: dict,
+    admitted: int,
+    discharged: int,
+    *,
+    candidate_ids: list[int] | None = None,
 ) -> dict:
-    """Record state at a given time step."""
+    """Record state at a given time step.
+
+    ``assignments`` / ``candidate_ids`` are additive fields used by the
+    HV–churn engineering runner; existing consumers ignore them.
+    """
     weights = [o["weight"] for o in occupied.values()]
     sofas = [o["sofa"] for o in occupied.values()]
     stays = [o["steps_in_icu"] for o in occupied.values()]
@@ -196,6 +217,10 @@ def _snapshot(
         "avg_weight": round(sum(weights) / max(len(weights), 1), 3),
         "avg_sofa": round(sum(sofas) / max(len(sofas), 1), 1),
         "avg_stay_steps": round(sum(stays) / max(len(stays), 1), 1),
+        "assignments": {
+            str(occ["stay_id"]): str(bed) for bed, occ in occupied.items()
+        },
+        "candidate_ids": [int(x) for x in (candidate_ids or [])],
     }
 
 
