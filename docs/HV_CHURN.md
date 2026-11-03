@@ -1,6 +1,6 @@
 # H10 · 前沿适配 + 滚动 HV–churn
 
-> 状态：**研究原型（合成演示）**。只依赖 numpy；不读数据库、不跑 CP-SAT/MIMIC、不访问网络。
+> 状态：**研究原型 + 工程 runner**。demo 为合成；`application/run_hv_churn.py` 接真实滚动 + 每步 ε 前沿。
 > 代码：`domain/optimizer/pareto_io.py` · 脚本：`scripts/hv_churn_demo.py` · 测试：`tests/test_pareto_io.py`
 > 关联：[PARETO_DECISION.md](PARETO_DECISION.md)（H10 决策层）· `moo_phase3`（前沿生成/HV）· H6 滚动 · P4 前沿质量。
 
@@ -126,3 +126,21 @@ HV 波动大 + turnover 高 = 候选池在扰动下非支配集频繁重排，�
 2. **归一化口径**：默认按**每一步自身**的 min-max，跨步 HV 只可比形状；若要绝对可比，须传入**全窗共用**的 `ideal/nadir`（固定参考点）。
 3. **数据质量前置**：真实接入需先完成数据授权（F1）与数据质量修复，且 `reports/moo/*.json` 的目标口径要经 P4 校准。
 4. **无临床结论**：本模块只度量“前沿/分配稳不稳”，不评价临床收益，也不替代 CP-SAT 的可行性约束。
+
+## 8. 工程链路（2026-11-03）
+
+已打通：**滚动引擎的每步 assignments/candidate_ids → 每步小 ε 网格前沿 → `hv_churn_series`**。
+
+```powershell
+cd "C:\Users\lenovo\Desktop\decision shcedule\icu-scheduling-agent"
+$env:PYTHONPATH = (Get-Location)
+.\.venv\Scripts\python.exe -m application.run_hv_churn --steps 2 --levels 2 --max-time 3
+```
+
+- 入口：`application/run_hv_churn.py`；
+- 滚动引擎 `domain/rolling/engine.py::_snapshot` 新增 `assignments` / `candidate_ids`（additive，旧消费者忽略）；
+- 每步前沿：对当前候选集跑 `run_payoff_table` + `run_epsilon_grid_scan`，用 `normalize_for_maximization` 归一化；
+- 输出：`reports/pareto_decision/hv_churn_rolling.json`（config / rolling / series / summary）；
+- 测试：`tests/test_hv_churn_runner.py`（wiring，无 DB）+ `test_pareto_io.py` + `test_pto_and_rolling_contrast.py` = 22 passed。
+
+本次试跑（2 步、levels=2、max-time=3s）：mean_hv **0.271885**、mean_turnover **0.25**、total_churn **0.0**（该次滚动未换床，churn=0 是真实结果，不是缺省）。
