@@ -1,0 +1,33 @@
+repo: C:\Users\lenovo\Desktop\decision shcedule\icu-scheduling-agent
+
+files:
+  - docs/TECHNICAL_OVERVIEW.md
+  - docs/AIGC_CONTRACT.md
+  - docs/BRIEF.md
+  - domain/optimizer/data_contract.py
+  - domain/optimizer/fd_stress.py
+  - domain/optimizer/pool_effect.py
+  - domain/optimizer/pareto_decision.py
+  - scripts/aigc_mimic_grid.py
+
+python: .venv\Scripts\python.exe
+
+modules:
+  - numpy
+  - ortools
+  - psycopg
+  - yaml
+
+db:
+  dsn: postgresql://icu_dev:icu_dev@127.0.0.1:5432/icu_scheduling
+  tables:
+    - name: feat.patient_priority
+      columns: [stay_id, priority_weight]
+      min_rows: 1000
+    - name: sched.assignments
+      columns: [run_id, stay_id, bed_id]
+      min_rows: 1
+
+commands:
+  - git
+  - python

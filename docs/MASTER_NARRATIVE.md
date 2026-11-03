@@ -1,7 +1,7 @@
 # 总目标 · 总内容（一条主线串全仓）
 
 > **本页是叙事 SSOT**：答辩、组员、Agent、文档索引都先对齐这里。  
-> 更新：2026-10-09 · 细节数字见 [STATUS.md](STATUS.md) · 够格判断见 [ACADEMIC_VALUE.md](ACADEMIC_VALUE.md)
+> 更新：2026-11-03 · 当前阶段 S4 · 细节数字见 [STATUS.md](STATUS.md) · 证据见 [AIGC_CONTRACT.md](AIGC_CONTRACT.md)
 
 ---
 
@@ -19,6 +19,19 @@
 | **可滚动** | 入出转变化后能再决策，不是一次性静态表 | `simulate` / H6 · 轨迹协议（RL 另轨） |
 
 **完成后的意义：** 不是「发明了新求解器」，而是交出一套可复现的 ICU 分床研究与演示平台——医院侧能解释，学术侧能对照，后续人能在同一协议上换模型。
+
+### 当前主创新（2026-11，S3–S4）
+
+| ID | 主张 | 证据 |
+|---|---|---|
+| S-A1 | DAC 语义可用性契约 | raw→refuse(3 违规)/repaired→pass；refusal_accuracy=1.0 |
+| S-A2 | FD 压测 | spurious_DoF 3→0 |
+| S-A3 | 同池反事实 B_pool | 真实网格资源场景=0；small_pool=−0.004864 |
+| S-B | 三条数据实证发现 | 隔离 76,157/94,458；priority corr=1.0；los 单位为天 |
+| S-C | H10 Pareto 决策层 | HV/VoF/CoM/MMR（合成 demo） |
+
+**不主张**：RFCC/CARE（五法同值 −0.0965）、Pareto 排序、PPO online、全面超越现网。
+
 
 ---
 
@@ -110,7 +123,7 @@ flowchart LR
 | 多目标细节 | [S2_MULTI_OBJECTIVE.md](S2_MULTI_OBJECTIVE.md) | `run_moo_phase3/4` |
 | 数据 / restore | [DUMP_READY.md](DUMP_READY.md) | restore 脚本 |
 | 老师创新口径 | [TEACHER_INNOVATION.md](TEACHER_INNOVATION.md) | DEMO |
-| 报告词（含新旧对比） | [REPORT_SPEECH.md](REPORT_SPEECH.md) | 答辩口述 |
+| 报告词（含新旧对比） | [REPORT_SPEECH.md](archive/REPORT_SPEECH.md) | 答辩口述 |
 | 模型与公式 | [MODEL_FORMULAS.md](MODEL_FORMULAS.md) | 板书 / 附录 |
 | 架构·创新·参数全览 | [ARCHITECTURE_INNOVATION_MATH.md](ARCHITECTURE_INNOVATION_MATH.md) | 投屏 / 答辩附录 |
 | Agent 契约 | 根目录 `AGENTS.md` | pytest 白名单 |

@@ -1,5 +1,21 @@
 # 项目状态
 
+> 更新：2026-11-03 · **当前主线：AIGC 语义契约 + 同池 B_pool + Pareto 决策层** · 阶段 S4
+> 当前证据：[AIGC_CONTRACT.md](AIGC_CONTRACT.md) · 人话版：[BRIEF.md](BRIEF.md) · 门禁：[STAGE.md](STAGE.md)
+
+## 2026-11-03 更新（当前结论）
+
+| 项 | 结果 |
+|---|---|
+| 真实网格 | 6 场景 × 5 seed；hv 0.0045–0.0094；assigned≈6–8（隔离启发式压缩候选池） |
+| B_pool | 资源场景=0；仅 small_pool=−0.004864 → 池效应只随池变化 |
+| 字段改名 | `care` 字段不实，已改为 `high_risk`（前沿 high_risk 目标值） |
+| 负对照 | `high_acuity` 权重放大在同池+归一化下预期无效应，已标为 neutral_control |
+| 已撤回 | RFCC/CARE（五法同值 −0.0965）；PPO online 不主张 |
+| 阶段 | S4（成稿）；门禁 `preflight.yaml` |
+
+> 以下为 2026-10-09 历史状态，保留追溯；冲突时以 2026-11-03 为准。
+
 > 更新：2026-10-09 · **独立调度** · **S2-MOO 1–5** + Fair H3 + bake-off + **H5/H6** · 默认 CP-SAT  
 > **总目标主线**：[MASTER_NARRATIVE.md](MASTER_NARRATIVE.md)（可审计 · 可对照 · 可滚动）  
 > **叙事**：仓内 SOFA/GBDT；**不**读 decision 风险分；有轨迹包仍**不**宣称 online MIMIC-PPO  

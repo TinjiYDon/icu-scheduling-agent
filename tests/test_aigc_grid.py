@@ -137,7 +137,7 @@ def _run(scenario: str, seed: int, **kwargs):
         "n_front": 4,
         "hv": 0.5,
         "assigned": 20.0,
-        "care": 5.0,
+        "high_risk": 5.0,
         "solve_time_sum": 1.0,
         "n_grid": 16,
         "pool_size": 200,
@@ -159,7 +159,7 @@ def test_aggregate_runs():
     assert agg["baseline"]["seeds"] == [0, 1]
     assert agg["baseline"]["hv_mean"] == pytest.approx(0.5)
     assert agg["baseline"]["hv_std"] == pytest.approx(0.1)
-    assert agg["baseline"]["care_mean"] == pytest.approx(5.0)
+    assert agg["baseline"]["high_risk_mean"] == pytest.approx(5.0)
     assert agg["small_pool"]["hv_std"] == 0.0
     assert agg["small_pool"]["pool_cap"] == 50
     for key in (
@@ -167,8 +167,8 @@ def test_aggregate_runs():
         "seeds",
         "hv_mean",
         "hv_std",
-        "care_mean",
-        "care_std",
+        "high_risk_mean",
+        "high_risk_std",
         "assigned_mean",
         "n_feasible_mean",
         "n_front_mean",
@@ -182,7 +182,7 @@ def test_aggregate_runs():
 
 def test_front_stats():
     empty = front_stats({"front": []})
-    assert empty == {"assigned": 0.0, "care": 0.0}
+    assert empty == {"assigned": 0.0, "high_risk": 0.0}
     scan = {
         "front": [
             {"values": {"occupancy": 20, "high_risk": 4}},
@@ -191,14 +191,14 @@ def test_front_stats():
     }
     stats = front_stats(scan)
     assert stats["assigned"] == pytest.approx(19.0)
-    assert stats["care"] == pytest.approx(5.0)
+    assert stats["high_risk"] == pytest.approx(5.0)
 
 
 # 4 — 同池反事实（B_pool）----------------------------------------------------
 
 
 def _agg(hv: float, care: float, pool_cap: int = 200):
-    return {"hv_mean": hv, "care_mean": care, "pool_cap": pool_cap}
+    return {"hv_mean": hv, "high_risk_mean": care, "pool_cap": pool_cap}
 
 
 def test_pool_effect_rows_keys_and_zero_for_same_pool():
@@ -212,7 +212,7 @@ def test_pool_effect_rows_keys_and_zero_for_same_pool():
     assert len(table["rows"]) == 1
     row = table["rows"][0]
     assert row["scenario"] == "more_beds"
-    assert set(row["metrics"]) == {"hv", "care"}
+    assert set(row["metrics"]) == {"hv", "high_risk"}
     # 同池（未给 matched 差异）→ delta_match == delta_naive → pool_effect == 0
     assert row["metrics"]["hv"]["pool_effect"] == pytest.approx(0.0)
     assert row["metrics"]["hv"]["delta_naive"] == pytest.approx(0.12)
