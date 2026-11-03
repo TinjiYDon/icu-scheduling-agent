@@ -56,3 +56,13 @@
 `docs/archive/`：报告词旧版、日期戳进度报告等被替代文档。
 
 ## 角色：A 数据 · B 算法/优化 · C 应用/集成
+
+
+## 7. 索引补遗（此前未被引用）
+
+| 文档 | 内容 |
+|---|---|
+| [GITHUB_ISSUES.md](GITHUB_ISSUES.md) | Issue 模板与流程 |
+| [INNOVATION_ROADMAP.md](INNOVATION_ROADMAP.md) | 创新里程碑 |
+| [ROADMAP_EXEC.md](ROADMAP_EXEC.md) | 路线执行清单 |
+| [TECH_REPORT_H10.md](TECH_REPORT_H10.md) | H10 技术文档 |

@@ -1,6 +1,6 @@
 # 模型、算法与数学公式（答辩技术附录）
 
-> 与报告词配套：[REPORT_SPEECH.md](REPORT_SPEECH.md) · 主线：[MASTER_NARRATIVE.md](MASTER_NARRATIVE.md)  
+> 与报告词配套：[REPORT_SPEECH.md](archive/REPORT_SPEECH.md) · 主线：[MASTER_NARRATIVE.md](MASTER_NARRATIVE.md)  
 > 符号与代码一致：`domain/optimizer/cp_sat.py` · `multiobjective.py` · `predict_priority.py`
 
 ---

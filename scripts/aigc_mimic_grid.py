@@ -73,6 +73,7 @@ class GridScenario:
     resource_overrides: Mapping[str, Any] = field(default_factory=dict)
     pool_cap: int | None = None  # None → 用 --max-patients
     priority_rule: str | None = None  # None | "high_sofa"
+    expectation: str = "effect"  # effect | neutral_control
 
 
 SCENARIOS: tuple[GridScenario, ...] = (
@@ -108,8 +109,9 @@ SCENARIOS: tuple[GridScenario, ...] = (
     GridScenario(
         id="high_acuity",
         name="高 SOFA 加权",
-        description=f"priority_overrides: SOFA≥{HIGH_RISK_SOFA} 的权重 ×{HIGH_SOFA_BUMP}",
+        description=f"负对照：SOFA≥{HIGH_RISK_SOFA} 权重 ×{HIGH_SOFA_BUMP}（归一化+同池下预期无效应）",
         priority_rule="high_sofa",
+        expectation="neutral_control",
     ),
 )
 
@@ -390,15 +392,15 @@ def mean_std(values: Sequence[float]) -> tuple[float, float]:
 
 
 def front_stats(scan: Mapping[str, Any]) -> dict[str, float]:
-    """非支配前沿上的 ``assigned`` / ``care`` 均值（前沿为空 → 0）。"""
+    """非支配前沿上的 ``assigned`` / ``high_risk`` 均值（前沿为空 → 0）。"""
     front = list(scan.get("front") or [])
     if not front:
-        return {"assigned": 0.0, "care": 0.0}
+        return {"assigned": 0.0, "high_risk": 0.0}
     assigned = [float((p.get("values") or {}).get("occupancy", 0)) for p in front]
-    care = [float((p.get("values") or {}).get("high_risk", 0)) for p in front]
+    high_risk = [float((p.get("values") or {}).get("high_risk", 0)) for p in front]
     return {
         "assigned": float(np.mean(assigned)),
-        "care": float(np.mean(care)),
+        "high_risk": float(np.mean(high_risk)),
     }
 
 
@@ -427,7 +429,7 @@ def build_run_record(
         "n_front": int(scan.get("n_nondominated") or 0),
         "hv": float(scan.get("hypervolume") or 0.0),
         "assigned": stats["assigned"],
-        "care": stats["care"],
+        "high_risk": stats["high_risk"],
         "solve_time_sum": solve_time_sum(payoff, scan),
         "n_grid": int(scan.get("n_grid") or 0),
         "pool_size": int(pool_size),
@@ -436,7 +438,7 @@ def build_run_record(
 
 
 def aggregate_runs(runs: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
-    """按场景汇总：``hv`` 均值±std、``care`` / ``assigned`` 均值等。"""
+    """按场景汇总：``hv`` 均值±std、``high_risk`` / ``assigned`` 均值等。"""
     if not runs:
         raise ValueError("runs 为空：至少需要 1 条记录")
     grouped: dict[str, list[Mapping[str, Any]]] = {}
@@ -446,7 +448,7 @@ def aggregate_runs(runs: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, Any
     out: dict[str, dict[str, Any]] = {}
     for sid, items in grouped.items():
         hv_mean, hv_std = mean_std([float(i["hv"]) for i in items])
-        care_mean, care_std = mean_std([float(i["care"]) for i in items])
+        high_risk_mean, high_risk_std = mean_std([float(i["high_risk"]) for i in items])
         assigned_mean, _ = mean_std([float(i["assigned"]) for i in items])
         feasible_mean, _ = mean_std([float(i["n_feasible"]) for i in items])
         front_mean, _ = mean_std([float(i["n_front"]) for i in items])
@@ -456,8 +458,8 @@ def aggregate_runs(runs: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, Any
             "seeds": sorted(int(i["seed"]) for i in items),
             "hv_mean": hv_mean,
             "hv_std": hv_std,
-            "care_mean": care_mean,
-            "care_std": care_std,
+            "high_risk_mean": high_risk_mean,
+            "high_risk_std": high_risk_std,
             "assigned_mean": assigned_mean,
             "n_feasible_mean": feasible_mean,
             "n_front_mean": front_mean,
@@ -499,18 +501,18 @@ def pool_effect_rows(
             matched_a=float(same_pool.get("hv_mean", base["hv_mean"])),
             matched_b=float(agg["hv_mean"]),
         )
-        care_eff = pool_effect(
-            naive_a=float(base["care_mean"]),
-            naive_b=float(agg["care_mean"]),
-            matched_a=float(same_pool.get("care_mean", base["care_mean"])),
-            matched_b=float(agg["care_mean"]),
+        high_risk_eff = pool_effect(
+            naive_a=float(base["high_risk_mean"]),
+            naive_b=float(agg["high_risk_mean"]),
+            matched_a=float(same_pool.get("high_risk_mean", base["high_risk_mean"])),
+            matched_b=float(agg["high_risk_mean"]),
         )
         hv_effects[sid] = float(hv_eff["pool_effect"])
         rows.append(
             {
                 "scenario": sid,
                 "matched_pool_cap": same_pool.get("pool_cap", agg.get("pool_cap")),
-                "metrics": {"hv": hv_eff, "care": care_eff},
+                "metrics": {"hv": hv_eff, "high_risk": high_risk_eff},
                 "B_pool_hv": float(hv_eff["pool_effect"]),
             }
         )
@@ -853,7 +855,7 @@ def main(argv: Sequence[str] | None = None, *, env: Mapping[str, str] | None = N
                     sid: {
                         "hv_mean": round(agg["hv_mean"], 6),
                         "hv_std": round(agg["hv_std"], 6),
-                        "care_mean": round(agg["care_mean"], 3),
+                        "high_risk_mean": round(agg["high_risk_mean"], 3),
                     }
                     for sid, agg in payload["scenarios"].items()
                 },

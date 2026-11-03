@@ -125,7 +125,7 @@ from domain.optimizer.pool_effect import (
 ## 6. MIMIC 网格运行器
 
 `scripts/aigc_mimic_grid.py`：**6 场景 × N seed 的 ε 网格**，每个场景每 seed 记录
-`n_feasible / n_front / hv / assigned / care / solve_time_sum`，再把场景两两喂给
+`n_feasible / n_front / hv / assigned / high_risk / solve_time_sum`，再把场景两两喂给
 `pool_effect` 得到 B_pool 表。它只**编排**，求解链仍是
 `moo_phase3.run_payoff_table → run_epsilon_grid_scan → hypervolume`
 （与 `application/run_moo_phase3.py` 同一条链），`solve` 回调换成
@@ -189,13 +189,13 @@ $env:AIGC_MIMIC_ALLOW = "1"
              "levels": 3, "max_time_seconds": 30, "max_patients": 200,
              "gate": "AIGC_MIMIC_ALLOW=1", "seed_effect": "..."},
   "runs": [{"scenario": "baseline", "seed": 0, "n_feasible": 32, "n_front": 7,
-            "hv": 0.0, "assigned": 20.0, "care": 5.0, "solve_time_sum": 0.0,
+            "hv": 0.0, "assigned": 20.0, "high_risk": 5.0, "solve_time_sum": 0.0,
             "n_grid": 81, "pool_size": 200, "pool_cap": 200}],
   "scenarios": {"baseline": {"n_seeds": 5, "hv_mean": 0.0, "hv_std": 0.0,
-                            "care_mean": 0.0, "assigned_mean": 0.0, ...}},
+                            "high_risk_mean": 0.0, "assigned_mean": 0.0, ...}},
   "pool_effect": {"baseline": "baseline", "baseline_hv_mean": 0.0,
                   "rows": [{"scenario": "small_pool", "matched_pool_cap": 50,
-                            "metrics": {"hv": {...}, "care": {...}}, "B_pool_hv": 0.0}],
+                            "metrics": {"hv": {...}, "high_risk": {...}}, "B_pool_hv": 0.0}],
                   "summary": {"n_metrics": 5, "mean_pool_effect": 0.0, ...}}
 }
 ```
@@ -203,7 +203,7 @@ $env:AIGC_MIMIC_ALLOW = "1"
 口径必须说明（写进报告时照抄）：
 
 - `hv`：7 目标前沿在 payoff ideal/nadir 归一化后的超体积（`moo_phase3` 同一实现）；
-- `assigned` / `care`：**非支配前沿上的均值**（`occupancy` → 已分床数、`high_risk` → SOFA≥10 覆盖数），
+- `assigned` / `high_risk`：**非支配前沿上的均值**（`occupancy` → 已分床数、`high_risk` → SOFA≥10 覆盖数），
   前沿为空记 0；
 - `hv_std`：**总体标准差**（`ddof=0`），1 个 seed 时为 0；
 - **seed 的作用**：`synthetic` 源下 seed 决定合成池；`db` 源下池同源，seed 只影响 CP-SAT
@@ -276,3 +276,10 @@ $env:AIGC_MIMIC_ALLOW = "1"
 
 一句话：OptiTrust/OptiBench 审的是“**代码对不对**”，DAC 审的是“**输入能不能用、用了多少真自由度**”，
 两者互补，不能互相替代。
+
+
+## 附：字段与负对照说明（2026-11-03）
+
+- 原 `care` 字段实际存的是前沿上的 `high_risk` 目标值（SOFA≥10 覆盖），不是 CARE 指数；已统一改名为 `high_risk` / `high_risk_mean`。
+- `high_acuity` 场景只把 SOFA≥10 的 `priority_weight` 乘 1.5；在归一化 + 同池下预期无效应，实际与 baseline 完全一致。它是**负对照**（`neutral_control`），不是“测到了高负荷”。
+- db 源下 `seeds` 只影响 CP-SAT `random_seed`，不是独立重采样；不能当稳健性证据。

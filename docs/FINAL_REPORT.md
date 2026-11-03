@@ -1,8 +1,11 @@
-# ICU 床位动态调度 · 完整汇报稿（面面俱到 · 约 12–15 分钟）
+# ICU 床位动态调度 · 完整汇报稿（历史稿）
+
+> **状态：历史汇报稿（H7 RFCC/CARE 已撤回）**。当前主线以 [AIGC_CONTRACT.md](AIGC_CONTRACT.md) / [TECHNICAL_OVERVIEW.md](TECHNICAL_OVERVIEW.md) 为准；本文保留作历史参考。
+
 
 > **本页 = 答辩/课题汇报唯一主讲稿**（可直接照着念）  
 > 技术附录：[ARCHITECTURE_INNOVATION_MATH.md](ARCHITECTURE_INNOVATION_MATH.md) · [H7_RFCC_CARE.md](H7_RFCC_CARE.md) · [MODEL_FORMULAS.md](MODEL_FORMULAS.md)  
-> 主线：[MASTER_NARRATIVE.md](MASTER_NARRATIVE.md) · 精简口播：[REPORT_SPEECH_COMPLETE.md](REPORT_SPEECH_COMPLETE.md)  
+> 主线：[MASTER_NARRATIVE.md](MASTER_NARRATIVE.md) · 精简口播：[REPORT_SPEECH_COMPLETE.md](archive/REPORT_SPEECH_COMPLETE.md)  
 > GitHub：`icu-scheduling-agent` · PR #16  
 > **禁区**：不宣称发明新 CP 求解器；不宣称 online MIMIC-PPO；不宣称全面超越医院现网；不接 decision `risk_score`
 
@@ -22,7 +25,7 @@ ICU 一紧张，值班要同时想：谁更危重、隔离床够不够、呼吸�
 
 以及今天最想强调的一句创新主张：
 
-> **在 MIMIC 可复现设定下，用可解释硬约束做分床；相对「只调权重 / 占用优先词典序」，我们提出具名新机制 RFCC 与新指数 CARE/UHRM，并在同池对照中验收。**
+> **（历史主张，已撤回）RFCC/CARE 在五法同池对照中无差异（均为 −0.0965），不再作为创新主张。** 当前主张见 [AIGC_CONTRACT.md](AIGC_CONTRACT.md)。
 
 边界三句话：  
 ① 本课题**独立**，不读取预警项目的 risk_score；  
