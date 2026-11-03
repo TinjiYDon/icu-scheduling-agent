@@ -1,5 +1,7 @@
 # SOTA / 文献与市面对标 · icu-scheduling-agent
 
+> **2026-11-03 更新**：本文的 H7（RFCC/CARE）已撤回（五法同池对照同值 −0.0965）；当前主线为 **DAC 语义契约 / FD 压测 / 同池 B_pool / H10 Pareto 决策层**，见 [AIGC_CONTRACT.md](AIGC_CONTRACT.md) 与 [TECHNICAL_OVERVIEW.md](TECHNICAL_OVERVIEW.md)。新增对标：OptiTrust（可验证优化合成）、OptiBench/ReSocratic（NL→优化 benchmark）、EGCL/OpenMed/QCC（证据门控，属 decision 侧）。**本仓不主张**生成器/SOTA、RFCC/CARE、Pareto 排序、online PPO。
+
 > 更新：2026-10-09 · Wave **S-LIT**（扩写近刊 ICU/OR 多目标）  
 > **规则**：未完成本文档「创新假设」验收前，STATUS/答辩稿 **禁止** 宣称「首创 / SOTA / online MIMIC-PPO 成功」。  
 > 创新点须能一句话回答：**相对谁、改了什么、指标如何更好**。  
@@ -62,7 +64,7 @@
 | **H4（采入）** | **S2-MOO**：同硬约束下三种多目标机理对照，优于「只调一组 λ」 | 单一加权和黑箱折中 | Weighted / Lex / ε-Constraint | 三模式状态/目标值/耗时可复现表；默认仍 `cp_sat` |
 | **H5（采入）** | **PtO 决策质量**：换紧迫度模型会改变分床结果 | 只报 Spearman/top-k | `priority_overrides` + 同池求解 | Jaccard/指标差；`run_pto_ablation` |
 | **H6（采入）** | **滚动再优化**优于只贪心填空床 | 一次性/无重优化滚动 | `reoptimize` 开关 | 时段均值 SOFA/权重；`run_rolling_contrast` |
-| **H7（采入）** | **RFCC** 稀缺触发风险优先级联 + **CARE/UHRM** 指数 | 占用优先 Lex / 只调 λ / 无综合指数 | `clinical_cascade` · `care_index` | bake-off CARE；见 [H7_RFCC_CARE.md](H7_RFCC_CARE.md) |
+| **H7（已撤回）** | ~~RFCC 稀缺触发风险优先级联 + CARE/UHRM 指数~~ | 占用优先 Lex / 只调 λ / 无综合指数 | `clinical_cascade` · `care_index` | 五法同值 −0.0965；不再主张 |
 
 ### 已采入工程落点（2026-09-24 · H5/H6 2026-10-09）
 
