@@ -28,6 +28,7 @@
 | 文档 | 内容 |
 |---|---|
 | [MODEL_FORMULAS.md](MODEL_FORMULAS.md) | 全部模型/算法公式 |
+| [SOFA_SCORING.md](SOFA_SCORING.md) / [ROLLING_PARETO_MODEL.md](ROLLING_PARETO_MODEL.md) | D3/P8：六分量评分、因果时间窗、滚动 f5 数学口径 |
 | [ARCHITECTURE_INNOVATION_MATH.md](ARCHITECTURE_INNOVATION_MATH.md) | 架构·创新·参数全览 |
 | [PARAM_STORY.md](PARAM_STORY.md) / [LAMBDA_TUNING.md](LAMBDA_TUNING.md) | 参数口径 / λ 调参 |
 | [TRAJECTORY_PROTOCOL.md](TRAJECTORY_PROTOCOL.md) | 轨迹协议 |
@@ -37,6 +38,7 @@
 | 文档 | 内容 |
 |---|---|
 | [DATA_LOCAL.md](DATA_LOCAL.md) / [DUMP_READY.md](DUMP_READY.md) | 数据约定 / dump 恢复 |
+| [SOFA_ROLLING_TASK.md](SOFA_ROLLING_TASK.md) | 小样本 SOFA 时序 / 24h 滚动 Pareto 复跑与验收 |
 | [S2_MULTI_OBJECTIVE.md](S2_MULTI_OBJECTIVE.md) | 多目标实验 |
 | [PPO_SMOKE.md](PPO_SMOKE.md) / [PPO_MODEL_HANDOFF.md](PPO_MODEL_HANDOFF.md) | PPO 对照（不主张 online） |
 | [DEMO_SCRIPT.md](DEMO_SCRIPT.md) / [TUNING_LOCAL.md](TUNING_LOCAL.md) | 演示与启动 |

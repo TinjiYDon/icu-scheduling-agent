@@ -35,6 +35,14 @@ from infra.config import load_yaml
 from infra.db import get_engine
 
 
+class AssignmentSolveError(RuntimeError):
+    """A non-feasible solve, retaining its status for epsilon-grid reporting."""
+
+    def __init__(self, status: str):
+        self.solver_status = status
+        super().__init__(f"CP-SAT failed: status={status}")
+
+
 def _careunit_zone(careunit: str | None) -> int:
     """Map careunit to bed zone index. 0=unknown, 1=MICU, 2=SICU, 3=CCU, 4=NICU."""
     if not careunit:
@@ -155,6 +163,10 @@ def run_assignment(
     max_time_seconds: float | None = None,
     resource_overrides: Mapping[str, object] | None = None,
     priority_overrides: Mapping[int, float] | None = None,
+    candidate_rows: Sequence[Mapping[str, object]] | None = None,
+    solver_seed: int | None = None,
+    retain_occupied: bool = False,
+    constraint_modes: Mapping[str, str] | None = None,
 ) -> dict:
     """Run CP-SAT bed assignment.
 
@@ -178,7 +190,34 @@ def run_assignment(
         resource_overrides: optional patch for ``resources.*`` (phase-4 scenarios).
         priority_overrides: optional stay_id → priority_weight (PtO ablation);
             does not write ``feat.patient_priority``.
+        candidate_rows: explicit time-specific patient snapshot; requires
+            persist=False and bypasses the database. SOFA must be in [0,24].
+        solver_seed: fixed random seed and one worker for reproducible samples.
+        retain_occupied: require existing inpatients to remain assigned.
+        constraint_modes: per-run isolation/ventilator modes: "none" disables
+            demo demand heuristics, "configured" retains the configured rules.
     """
+    modes = dict(constraint_modes or {})
+    if set(modes) - {"isolation", "ventilator"} or any(
+        mode not in ("none", "configured") for mode in modes.values()
+    ):
+        raise ValueError("constraint_modes accepts isolation/ventilator: none or configured")
+    if candidate_rows is not None:
+        if persist:
+            raise ValueError("candidate_rows requires persist=False")
+        if stay_ids is not None or split is not None:
+            raise ValueError("candidate_rows already fixes the candidate pool; omit stay_ids/split")
+        candidate_rows = [dict(row) for row in candidate_rows]
+        ids = [int(row["stay_id"]) for row in candidate_rows]
+        if len(ids) != len(set(ids)) or any(sid <= 0 for sid in ids):
+            raise ValueError("candidate_rows must have unique positive stay_id")
+        for row in candidate_rows:
+            sofa, weight = float(row["sofa_total"]), float(row["priority_weight"])
+            if not math.isfinite(sofa) or not 0 <= sofa <= 24 or not sofa.is_integer():
+                raise ValueError("candidate_rows sofa_total must be an integer in [0,24]")
+            if not math.isfinite(weight) or weight < 0:
+                raise ValueError("candidate_rows priority_weight must be finite and nonnegative")
+            row.update(stay_id=int(row["stay_id"]), sofa_total=sofa, priority_weight=weight)
     if split is not None and split not in ("calib", "eval"):
         raise ValueError("split must be 'calib', 'eval' or None")
     opt = load_yaml("optimizer.yaml")
@@ -187,6 +226,13 @@ def run_assignment(
     if resource_overrides:
         resources.update(dict(resource_overrides))
     n_beds = int(resources.get("n_beds", 20))
+    if n_beds < 1:
+        raise ValueError("n_beds must be positive")
+    occupied_beds = {int(sid): int(bed) for sid, bed in (occupied_beds or {}).items()}
+    if len(set(occupied_beds.values())) != len(occupied_beds) or any(
+        bed < 1 or bed > n_beds for bed in occupied_beds.values()
+    ):
+        raise ValueError("occupied_beds must reference unique valid beds")
     solver_time = float(
         max_time_seconds
         if max_time_seconds is not None
@@ -240,42 +286,45 @@ def run_assignment(
     run_id = run_id or f"p0_{uuid.uuid4().hex[:8]}"
 
     # ── 1. Load patients ──────────────────────────────────────────
-    engine = get_engine()
-    with engine.connect() as conn:
-        if stay_ids is not None:
-            rows = conn.execute(
-                text(
-                    """
-                    SELECT s.stay_id, COALESCE(p.priority_weight, 1.0) AS priority_weight,
-                           COALESCE(so.sofa_total, 0) AS sofa_total,
-                           s.first_careunit
-                    FROM staging.icustays s
-                    LEFT JOIN feat.patient_priority p ON s.stay_id = p.stay_id
-                    LEFT JOIN feat.sofa_timeseries so ON s.stay_id = so.stay_id AND so.hour_index = 0
-                    WHERE s.stay_id IN :stay_ids
-                    ORDER BY priority_weight DESC, sofa_total DESC, s.stay_id
-                    """
-                ).bindparams(bindparam("stay_ids", expanding=True)),
-                {"stay_ids": [int(stay_id) for stay_id in stay_ids]},
-            ).mappings().all()
-        else:
-            rows = conn.execute(
-                text(
-                    """
-                    SELECT s.stay_id, COALESCE(p.priority_weight, 1.0) AS priority_weight,
-                           COALESCE(so.sofa_total, 0) AS sofa_total,
-                           s.first_careunit
-                    FROM staging.icustays s
-                    LEFT JOIN feat.patient_priority p ON s.stay_id = p.stay_id
-                    LEFT JOIN feat.sofa_timeseries so ON s.stay_id = so.stay_id AND so.hour_index = 0
-                    ORDER BY priority_weight DESC, sofa_total DESC, s.stay_id
-                    LIMIT :max_patients
-                    """
-                ),
-                {"max_patients": max_patients},
-            ).mappings().all()
-
-    stays = [dict(r) for r in rows]
+    engine = None
+    if candidate_rows is not None:
+        stays = sorted(candidate_rows, key=lambda s: int(s["stay_id"]))
+    else:
+        engine = get_engine()
+        with engine.connect() as conn:
+            if stay_ids is not None:
+                rows = conn.execute(
+                    text(
+                        """
+                        SELECT s.stay_id, COALESCE(p.priority_weight, 1.0) AS priority_weight,
+                               COALESCE(so.sofa_total, 0) AS sofa_total,
+                               s.first_careunit
+                        FROM staging.icustays s
+                        LEFT JOIN feat.patient_priority p ON s.stay_id = p.stay_id
+                        LEFT JOIN feat.sofa_timeseries so ON s.stay_id = so.stay_id AND so.hour_index = 0
+                        WHERE s.stay_id IN :stay_ids
+                        ORDER BY priority_weight DESC, sofa_total DESC, s.stay_id
+                        """
+                    ).bindparams(bindparam("stay_ids", expanding=True)),
+                    {"stay_ids": [int(stay_id) for stay_id in stay_ids]},
+                ).mappings().all()
+            else:
+                rows = conn.execute(
+                    text(
+                        """
+                        SELECT s.stay_id, COALESCE(p.priority_weight, 1.0) AS priority_weight,
+                               COALESCE(so.sofa_total, 0) AS sofa_total,
+                               s.first_careunit
+                        FROM staging.icustays s
+                        LEFT JOIN feat.patient_priority p ON s.stay_id = p.stay_id
+                        LEFT JOIN feat.sofa_timeseries so ON s.stay_id = so.stay_id AND so.hour_index = 0
+                        ORDER BY priority_weight DESC, sofa_total DESC, s.stay_id
+                        LIMIT :max_patients
+                        """
+                    ),
+                    {"max_patients": max_patients},
+                ).mappings().all()
+        stays = [dict(r) for r in rows]
     if priority_overrides:
         for s in stays:
             sid = int(s["stay_id"])
@@ -305,6 +354,8 @@ def run_assignment(
         }
 
     n = len(stays)
+    if retain_occupied and set(occupied_beds) - {s["stay_id"] for s in stays}:
+        raise ValueError("retained occupied patients must be in candidate snapshot")
     if n == 0:
         return {
             "run_id": run_id,
@@ -343,6 +394,10 @@ def run_assignment(
         cu = s.get("first_careunit")
         iso_flags[idx] = needs_isolation(cu)
         vent_flags[idx] = _needs_ventilator(s["stay_id"], float(s["sofa_total"]))
+        if modes.get("isolation") == "none":
+            iso_flags[idx] = False
+        if modes.get("ventilator") == "none":
+            vent_flags[idx] = False
         patient_zones[idx] = _careunit_zone(cu)
 
     # ── 2. Build CP-SAT model ─────────────────────────────────────
@@ -358,6 +413,10 @@ def run_assignment(
         model.Add(sum(x[i, b] for i in range(n)) <= 1)
     for i in range(n):
         model.Add(sum(x[i, b] for b in range(n_beds)) <= 1)
+    if retain_occupied:
+        for i, patient in enumerate(stays):
+            if patient["stay_id"] in occupied_beds:
+                model.Add(sum(x[i, b] for b in range(n_beds)) == 1)
 
     # Isolation patients must use isolation beds (first n_iso_beds).
     # Non-isolation patients may use any bed (including free isolation beds),
@@ -456,13 +515,13 @@ def run_assignment(
         if pref_start is None or pref_label == "ISO":
             continue
 
-        in_pref_zone = sum(x[i, b - 1] for b in range(pref_start, pref_start + pref_count))
-        assigned_anywhere = sum(x[i, b] for b in range(n_beds))
-        in_iso = sum(x[i, b] for b in range(n_iso_beds))
-
         # Mismatch only if: assigned somewhere AND NOT in pref zone AND NOT in ISO
         mismatch = model.NewIntVar(0, 1, f"mismatch_{i}")
-        model.Add(mismatch >= assigned_anywhere - in_pref_zone - in_iso)
+        # The preferred zone may overlap ISO beds. Count the union once so
+        # diagnostics remain exact even when mismatch is not optimized.
+        matched_beds = set(range(pref_start - 1, pref_start + pref_count - 1))
+        matched_beds.update(range(n_iso_beds))
+        model.Add(mismatch == sum(x[i, b] for b in range(n_beds) if b not in matched_beds))
         mismatch_terms.append(mismatch)
 
     if mismatch_terms:
@@ -532,11 +591,12 @@ def run_assignment(
         epsilon_bounds=epsilon_bounds,
         max_time_seconds=solver_time,
         cascade_context=cascade_context,
+        solver_seed=solver_seed,
     )
     solver = multiobjective.solver
     status = multiobjective.status
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-        raise RuntimeError(f"CP-SAT failed: status={status}")
+        raise AssignmentSolveError(solver.StatusName(status))
 
     # ── 5. Collect results ────────────────────────────────────────
     assignments = []
@@ -563,6 +623,7 @@ def run_assignment(
 
     # Tuning runs should not fill the production assignment table.
     if persist:
+        assert engine is not None
         with engine.begin() as conn:
             conn.execute(
                 text("DELETE FROM sched.assignments WHERE run_id = :run_id"),
@@ -699,7 +760,7 @@ def run_assignment(
             "ventilators_used": f"{n_vent_used}/{n_vents}",
             "zone_matches": f"{n_zone_match}/{len(assignments)}",
         },
-        "constraint_rules": constraint_disclosure(),
+        "constraint_rules": {**constraint_disclosure(), "run_mode_overrides": modes},
         "constraint_demand": {
             "n_isolation_demand": int(sum(1 for f in iso_flags if f)),
             "n_ventilator_demand": int(sum(1 for f in vent_flags if f)),

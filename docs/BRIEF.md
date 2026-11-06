@@ -46,5 +46,7 @@
 
 ## 现在到哪一步
 
+2026-11-04 补充：D3/P8 新增本地小样本的六分量 SOFA、2h 时间标签和 24h 滚动 Pareto 入口。该入口用相对 ICU 时间构造队列；每轮使用当前评分与决策前床位，记录 f5 和方案相似度。算法沿用当前 CP-SAT 七目标；评分/数学定义/验证范围见 [SOFA_ROLLING_TASK.md](SOFA_ROLLING_TASK.md)。旧数据库流程仍为原评分口径，未以抽样输出覆盖；本次不追加效果结论。
+
 阶段 S4（成稿）。已实现：DAC 语义契约、FD 压测、B_pool、H10 决策层、ε 网格、真实 MIMIC 网格。
 不主张：Pareto 排序、RFCC/CARE、PPO online、全面超越现网。

@@ -96,9 +96,12 @@ def _integer_bound(name: str, raw_value: float) -> int:
     return int(value)
 
 
-def _new_solver(max_time_seconds: float) -> cp_model.CpSolver:
+def _new_solver(max_time_seconds: float, solver_seed: int | None = None) -> cp_model.CpSolver:
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = max(float(max_time_seconds), 0.001)
+    if solver_seed is not None:
+        solver.parameters.random_seed = int(solver_seed)
+        solver.parameters.num_search_workers = 1
     return solver
 
 
@@ -132,6 +135,7 @@ def solve_multiobjective(
     epsilon_bounds: Mapping[str, int | float] | None = None,
     max_time_seconds: float = 30.0,
     cascade_context: Mapping[str, int] | None = None,
+    solver_seed: int | None = None,
 ) -> MultiObjectiveSolveResult:
     """Solve one CP-SAT model with a selected multi-objective strategy.
 
@@ -188,7 +192,7 @@ def solve_multiobjective(
         if not any(float(resolved_weights.get(spec.name, 0.0)) > 0 for spec in specs):
             raise ValueError("at least one objective weight must be greater than zero")
         model.Maximize(sum(terms))
-        solver = _new_solver(max_time_seconds)
+        solver = _new_solver(max_time_seconds, solver_seed)
         status = solver.Solve(model)
         stages.append(
             {
@@ -201,7 +205,7 @@ def solve_multiobjective(
 
     elif mode == "lexicographic":
         order = _validate_order(objective_order, by_name)
-        solver = _new_solver(max_time_seconds)
+        solver = _new_solver(max_time_seconds, solver_seed)
         status = cp_model.UNKNOWN
         for index, name in enumerate(order):
             elapsed = perf_counter() - started
@@ -254,7 +258,7 @@ def solve_multiobjective(
                 model.Add(spec.expression <= bound)
         primary = by_name[primary_name]
         _set_objective(model, primary)
-        solver = _new_solver(max_time_seconds)
+        solver = _new_solver(max_time_seconds, solver_seed)
         status = solver.Solve(model)
         stages.append(
             {
