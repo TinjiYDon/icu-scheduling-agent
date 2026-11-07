@@ -53,8 +53,12 @@ $env:PYTHONPATH = (Get-Location)
 | 用途 | 入口 |
 |------|------|
 | 滚动仿真(CLI) | `python -m application.simulate` |
+| 六分量 SOFA 小样本 | `python -m application.prepare_sofa_sample` |
+| 带时间标签的滚动 Pareto | `python -m application.run_timed_pareto --input artifacts/sofa_sample/sofa_sample.json` |
 | 读取分床方案 | `from application.plan import get_plan, run_simulation_with_plan` |
 | 策略入口 | `from application.optimize import optimize` |
+
+小样本复跑命令见 [D3/P8 任务说明](MULTIOBJECTIVE_TASKS.md#p8-滚动层接入小样本回放)，评分口径见 [SOFA_SCORING.md](SOFA_SCORING.md)。
 
 ## 关键契约
 

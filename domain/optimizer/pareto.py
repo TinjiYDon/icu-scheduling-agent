@@ -14,8 +14,8 @@ from __future__ import annotations
 import json
 import math
 import uuid
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Mapping
 
 from domain.optimizer.cp_sat import run_assignment
 from domain.optimizer.objectives import OBJECTIVES
@@ -95,6 +95,7 @@ def solve_anchors(
     *,
     practical_guard_ratio: float = 0.9,
     persist: bool = False,
+    solve: Callable[..., dict] | None = None,
     **run_kwargs,
 ) -> dict:
     """Solve pure and practical anchors for all six objectives."""
@@ -103,22 +104,23 @@ def solve_anchors(
             raise ValueError(f"{forbidden} is managed internally by solve_anchors")
 
     run_id = f"anchor_{uuid.uuid4().hex[:8]}"
+    solve = run_assignment if solve is None else solve
 
     pure: dict[str, dict] = {}
     for name in OBJECTIVES:
-        result = run_assignment(pivot=name, persist=persist, **run_kwargs)
+        result = solve(pivot=name, persist=persist, **run_kwargs)
         pure[name] = _anchor_record(result)
 
     ideal_pure, nadir_pure = _ideal_nadir(pure)
 
-    guard_min = max(1, int(math.floor(practical_guard_ratio * ideal_pure["occupancy"])))
+    guard_min = max(1, math.floor(practical_guard_ratio * ideal_pure["occupancy"]))
 
     practical: dict[str, dict] = {}
     for name in OBJECTIVES:
         if name == "occupancy":
             practical[name] = pure[name]
             continue
-        result = run_assignment(
+        result = solve(
             pivot=name,
             epsilon={"occupancy": guard_min},
             persist=persist,

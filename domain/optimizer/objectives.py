@@ -11,8 +11,8 @@ modelling code:
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Callable, Mapping, Sequence
 
 from ortools.sat.python import cp_model
 
@@ -74,9 +74,8 @@ def _balance(model, x, ctx: ModelContext):
     if len(loads) >= 2:
         zone_max = model.NewIntVar(0, ctx.n_beds, "zone_max_load")
         zone_min = model.NewIntVar(0, ctx.n_beds, "zone_min_load")
-        for zl in loads:
-            model.Add(zone_max >= zl)
-            model.Add(zone_min <= zl)
+        model.AddMaxEquality(zone_max, loads)
+        model.AddMinEquality(zone_min, loads)
         load_range = model.NewIntVar(0, ctx.n_beds, "zone_load_range")
         model.Add(load_range == zone_max - zone_min)
     else:

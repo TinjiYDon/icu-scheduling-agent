@@ -54,12 +54,12 @@
 - 涉及文件：`domain/scoring/priority.py`、`domain/optimizer/cp_sat.py`、`configs/optimizer.yaml`、`tests/test_priority.py`。
 - 状态：已完成（2026-10-27）。
 
-### D3 SOFA 区分度低且无时间序列
+### D3 SOFA 区分度低且无时间序列（小样本入口已实现）
 
-- 现状：0–12 分（仅肾/肝/凝血），71.7% 集中在 4–5 分；`sofa_timeseries` 只有 `hour_index = 0`。
+- 旧数据：0–12 分（仅肾/肝/凝血），71.7% 集中在 4–5 分；`sofa_timeseries` 只有 `hour_index = 0`。
 - 影响：$f_2$ 分辨率不足；无法建模等待期间的病情演变。
 - 修复方向：补齐呼吸/循环/神经分量；或按时间窗生成多小时 SOFA；或改用 SOFA 分段/阈值约束。
-- 状态：待修复。
+- 交付：`application.prepare_sofa_sample` 从 MIMIC-IV 3.1 固定抽样，按 2h 端点生成 24h 回顾窗的六分量 SOFA。留存证据时间、缺失标记与分量值。评分规则、数据覆盖条件与官方 SQL 的差异见 [SOFA_SCORING.md](SOFA_SCORING.md)。原数据库入口仍沿用历史评分口径。
 
 ### D4.1 呼吸机标记（已完成）
 
@@ -390,16 +390,31 @@ CREATE TABLE IF NOT EXISTS sched.pareto_solutions (
 
 ---
 
-## P8 滚动层接入（预计 1–2 天）
+## P8 滚动层接入（小样本回放）
 
-- [ ] `domain/rolling/engine.py` 每步调用 `run_assignment(previous_beds=...)`
-- [ ] 记录每步的 $f_5$ 与方案相似度
-- [ ] 输出滚动轨迹中的"稳定性—收益"曲线
+- [x] `domain/rolling/timed_pareto.py` 每步读取可用 SOFA，并将决策前床位传给 `run_assignment(previous_beds=...)`。
+- [x] 保存每步的 $f_5$、方案相似度、六目标值和备选分配。
+- [x] 保存稳定性与收益原始值，交给后续分析绘图。
 
 **验收**
 
-- 跑完整 24h 仿真，$f_5$ 不再恒为 0
-- 方案相似度指标可复现
+- 24h 回放含 13 个决策快照。按床位映射独立重算 $f_5$ 和相似度，并检查患者状态守恒。构造例验证非零挪床，真实执行方案可为零。
+- 使用同一评分输入和种子复跑，核对决策与备选解。数学口径见 [MULTIOBJECTIVE_THEORY.md 第 8 节](MULTIOBJECTIVE_THEORY.md#8-带时间标签的滚动-pareto)。
+
+```powershell
+.\.venv\Scripts\python.exe -m application.prepare_sofa_sample --zip ..\mimic-iv-3.1.zip --size 50 --seed 42
+.\.venv\Scripts\python.exe -m application.run_timed_pareto --input artifacts/sofa_sample/sofa_sample.json --steps 12 --seed 42 --levels 2 --max-time 3
+```
+
+首次准备数据时逐块筛选压缩包。评分缓存可用 `application.prepare_sofa_sample --score-only` 重算。评分和轨迹分别写到 `artifacts/sofa_sample/` 和 `reports/rolling/`，两者均受 Git 忽略。
+
+归档版验收（2026-11-07）。复用 MIMIC-IV 3.1 的 50 例缓存，重新生成 1,250 条评分，与功能分支评分逐字节一致。第 24 小时有 12 例六分量均可评分，其他缺项保留标记。20 床、种子 42、稀疏网格跑两遍 24h，13 个时点的执行分配、六目标及前沿备选一致。执行方案均为 OPTIMAL 且未发生挪床，前沿中有可行方案的 $f_5>0$。首轮验收的 100 次 ε 求解中有 87 次 OPTIMAL、2 次 FEASIBLE 和 11 次 INFEASIBLE。逐步核对评分可见时间、患者守恒、床位映射、挪床计数、ε 边界和非支配关系通过。
+
+本机验证运行了 102 项无数据库用例。`test_db.py` 的两个用例和 `test_get_plan_not_found` 依赖 PostgreSQL，本机未能连接数据库。复跑无数据库检查可先创建 `artifacts/`，再执行下列命令。
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests -q --ignore=tests/test_db.py -k 'not test_get_plan_not_found' --basetemp artifacts/pytest_archive
+```
 
 ---
 
@@ -428,4 +443,5 @@ $env:PYTHONPATH = (Get-Location)
 | P5 | `data_access/pareto_repo.py`、`migrations/004_pareto_solutions.sql` | — |
 | P6 | — | `application/`（新增评估入口） |
 | P7 | — | `domain/optimizer/objectives.py` |
-| P8 | — | `domain/rolling/engine.py` |
+| D3 | `application/prepare_sofa_sample.py`、`data_access/mimic_sample.py`、`domain/scoring/sofa_full.py` | — |
+| P8 | `application/run_timed_pareto.py`、`domain/rolling/timed_pareto.py` | `domain/optimizer/cp_sat.py`、`domain/optimizer/pareto.py` |
