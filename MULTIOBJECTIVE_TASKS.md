@@ -410,10 +410,10 @@ CREATE TABLE IF NOT EXISTS sched.pareto_solutions (
 
 归档版验收（2026-11-07）。复用 MIMIC-IV 3.1 的 50 例缓存，重新生成 1,250 条评分，与功能分支评分逐字节一致。第 24 小时有 12 例六分量均可评分，其他缺项保留标记。20 床、种子 42、稀疏网格跑两遍 24h，13 个时点的执行分配、六目标及前沿备选一致。执行方案均为 OPTIMAL 且未发生挪床，前沿中有可行方案的 $f_5>0$。首轮验收的 100 次 ε 求解中有 87 次 OPTIMAL、2 次 FEASIBLE 和 11 次 INFEASIBLE。逐步核对评分可见时间、患者守恒、床位映射、挪床计数、ε 边界和非支配关系通过。
 
-本机验证运行了 102 项无数据库用例。`test_db.py` 的两个用例和 `test_get_plan_not_found` 依赖 PostgreSQL，本机未能连接数据库。复跑无数据库检查可先创建 `artifacts/`，再执行下列命令。
+补验时使用本机 PostgreSQL 16 的 `127.0.0.1:5432`，在 `configs/database.yaml` 中配置实际连接。`test_db.py` 检查数据库连接和 `mock.icustays` 样例，`test_get_plan_not_found` 检查 `sched.assignments` 中不存在的方案。三项均通过，完整测试共 105 项通过。Docker 的 `5434` 是另一种部署方式，详见 [README](README.md#快速开始)。复跑完整测试前可先创建 `artifacts/`。
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest tests -q --ignore=tests/test_db.py -k 'not test_get_plan_not_found' --basetemp artifacts/pytest_archive
+.\.venv\Scripts\python.exe -m pytest tests -q --basetemp artifacts/pytest_archive
 ```
 
 ---

@@ -35,6 +35,8 @@ copy configs\data.yaml.example configs\data.yaml
 docker compose -p icu_scheduling up -d   # PostgreSQL 端口 5434
 ```
 
+在本地 `configs/database.yaml` 中把 `database.url` 的端口、用户和密码改成实际数据库配置。上面的 Docker 默认映射到 `5434`，本机直接安装的 PostgreSQL 通常用 `5432`。模板里的 `CHANGE_ME` 需要替换。Docker 初始化脚本会写入 `mock.icustays` 样例，下面的迁移会创建 `sched.assignments`。数据库测试使用这两张表，MIMIC 压缩包由评分入口单独读取。
+
 建表(按顺序执行 `migrations/` 下的 SQL,或使用任意迁移工具):
 
 ```powershell
