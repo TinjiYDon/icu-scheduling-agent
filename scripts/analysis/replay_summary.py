@@ -41,22 +41,31 @@ def summarise(path: Path) -> str:
     )
     out.append("")
     header = (
-        f"{'step':>4} {'hour':>4} {'elig':>5} {'out':>4} {'f0':>3} {'f1':>7} "
-        f"{'f2':>5} {'f3':>3} {'f4':>3} {'f5':>3} {'churn':>6} {'sim':>5} {'front':>5}"
+        f"{'step':>4} {'hour':>4} {'grid':>5} {'feas':>5} {'front':>5} {'ratio':>6} "
+        f"{'HV':>10} {'knee':>10} {'prom':>6} {'f0':>3} {'f1':>7} {'f4':>3} {'f5':>3}"
     )
     out.append(header)
     out.append("-" * len(header))
+    hvs: list[float] = []
+    n_distinct_knee = 0
     for h in hist:
         ev = h.get("objective_values") or {}
         scan = h.get("epsilon_scan") or {}
+        hv = scan.get("hypervolume")
+        if isinstance(hv, (int, float)):
+            hvs.append(float(hv))
+        prom = scan.get("knee_prominence")
+        if scan.get("knee_source"):
+            n_distinct_knee += 1
         out.append(
-            f"{h['step']:>4} {h['hour']:>4} {h.get('n_eligible_transfer', 0):>5} "
-            f"{len(h.get('transferred') or []):>4} "
+            f"{h['step']:>4} {h['hour']:>4} {scan.get('n_grid', '-'):>5} "
+            f"{scan.get('n_feasible', '-'):>5} {scan.get('n_nondominated', '-'):>5} "
+            f"{scan.get('nondominated_ratio', '-'):>6} "
+            f"{(f'{hv:.6f}' if isinstance(hv, (int, float)) else '-'):>10} "
+            f"{str(scan.get('knee_source') or '-'):>10} "
+            f"{(f'{prom:.4f}' if isinstance(prom, (int, float)) else '-'):>6} "
             f"{ev.get('occupancy', '-'):>3} {ev.get('wait', '-'):>7} "
-            f"{ev.get('overload', '-'):>5} {ev.get('balance', '-'):>3} "
-            f"{ev.get('zone_mismatch', '-'):>3} {h.get('f5_move', 0):>3} "
-            f"{h.get('churn', 0):>6} {h.get('similarity', 1):>5} "
-            f"{scan.get('n_nondominated', '-'):>5}"
+            f"{ev.get('zone_mismatch', '-'):>3} {h.get('f5_move', 0):>3}"
         )
     out.append("")
     out.append("totals")
@@ -67,6 +76,13 @@ def summarise(path: Path) -> str:
     out.append(f"  sum f4 (zone mismatch)    : {sum((h.get('objective_values') or {}).get('zone_mismatch', 0) for h in hist)}")
     out.append(f"  sum f5 (bed moves)        : {sum(h.get('f5_move', 0) for h in hist)}")
     out.append(f"  sum front points          : {sum((h.get('epsilon_scan') or {}).get('n_nondominated', 0) for h in hist)}")
+    if hvs:
+        out.append(f"  mean hypervolume          : {sum(hvs) / len(hvs):.6f}")
+        out.append(f"  hypervolume range         : {min(hvs):.6f} .. {max(hvs):.6f}")
+    out.append(
+        f"  steps with a distinct knee: {n_distinct_knee}/{len(hist)}"
+        "  (rest are linear fronts, no knee)"
+    )
     out.append(f"  eligible (person-steps)   : {sum(h.get('n_eligible_transfer', 0) for h in hist)}")
     transferred = hist[-1].get("transferred_total") or []
     out.append(f"  transferred (cumulative)  : {len(transferred)} {transferred}")

@@ -305,35 +305,130 @@ $$
 
 ---
 
-## P4 ε-约束扫描（预计 2 天）
+## P4 ε-约束扫描（阶段 A 已完成 2026-11-09）
 
 扫描配置已由 P3 锚点确定为：主目标 $f_1$，ε 维度 $\{f_2, f_4, f_0\}$，$f_3$ 剔除、$f_5$ 排除。详见「P3 → ε 网格设计」。
 
-- [ ] `epsilon_grid(pivot, ranges, qs) -> Iterable[dict]`：按公式 $\varepsilon_k^{(j)}=\lceil \tilde f^I_k + \frac{j}{q_k-1}(\tilde f^N_k-\tilde f^I_k)\rceil$ 生成
-- [ ] `solve_with_epsilon(pivot, eps, hint=None) -> dict`
-- [ ] 固定求解器种子（`num_search_workers=1`、`random_seed=0`），消除并列解抖动
-- [ ] 相邻网格解作为 CP-SAT solution hint（`model.AddHint`）
-- [ ] `nondominated_filter(solutions) -> list[dict]`
-- [ ] `hypervolume(front, ref) -> float`
-- [ ] `knee_point(front) -> dict`
-- [ ] 多进程并行扫描（按 ε 组合分片）
+实现落在 `domain/rolling/timed_pareto.py` 的 `_epsilon_grid` / `run_timed_pareto`（DB-free，可离线复跑），前沿质量指标在 `domain/optimizer/front_metrics.py`。
+
+- [x] `_epsilon_grid(payoff, levels, *, move_levels=None, level_map=None)`：按公式 $\varepsilon_k^{(j)}=\lceil \tilde f^I_k + \frac{j}{q_k-1}(\tilde f^N_k-\tilde f^I_k)\rceil$ 生成
+  - `level_map={"overload":10,"zone_mismatch":8}` 表达**非对称网格**（P3 的 $10\times8$），优先级高于 `move_levels` 与 `levels`
+  - 某轴 $q\le1$ 时该轴**被省略**，而不是钉在理想值上。钉住一个 min 型目标等于给它加硬约束（"首选病区零错配"），会把占用压到 19、$f_1$ 全平——这是修过的一个真实偏差
+- [x] `solve_with_epsilon` 等价能力：`run_assignment(active_objectives=..., epsilon=..., pivot=...)`，每点带 `epsilon` 边界断言（违反即抛 `RuntimeError`）
+- [x] 固定求解器种子：`solver_seed` → `parameters.random_seed` + `num_search_workers=1`
+- [ ] 相邻网格解作为 CP-SAT solution hint（`model.AddHint`）——**主动跳过**。$10\times8=80$ 点/步 × 13 步串行在 `--max-time 3` 下分钟级完成，hint 的收益抵不上把一个"上一点解"隐式注入另一个点带来的可解释性损失（hint 会改变搜索路径，使"同种子可复现"的语义变复杂）
+- [x] `_front(points)`：非支配过滤（sense-aware）
+- [x] `hypervolume(front, ref)`：`front_metrics.hypervolume`，**精确递归切片**（非 Monte Carlo），默认参考点 $-0.05$（归一化空间）
+- [x] `knee_point(front)`：`front_metrics.knee_analysis` / `knee_point`
+- [ ] 多进程并行扫描（按 ε 组合分片）——未做，当前串行已够快
 
 **扫描规模**
 
-| 阶段 | ε 维度 | 次数 | 预估耗时（单次 20–200 ms） |
-|------|--------|------|----------------------------|
-| A 稠密二维 | $f_2^{10}\times f_4^{8}$ | 80 | 2 s – 16 s |
-| B 全维度 | $f_2^{10}\times f_4^{8}\times f_0^{3}$ | 240 | 5 s – 48 s |
+| 阶段 | ε 维度 | 次数 | 状态 |
+|------|--------|------|------|
+| A 稠密二维 | $f_2^{10}\times f_4^{8}$ | 80/步（13 步共 1,040 次求解） | ✅ 已完成 |
+| B 全维度 | $f_2^{10}\times f_4^{8}\times f_0^{3}$ | 240/步 | ❌ 未实现：$f_0$ 目前只能作为**下限**（`guard["occupancy_min"]=floor(0.9·f0_ideal)`）进入模型，`_epsilon_grid` 没有 `occupancy` 轴。若要做阶段 B，需要先给 `_epsilon_grid` 加占用轴，或按"占用仅作 guard 下限"记录为设计决定 |
 
-**验收**
+**前沿质量指标的口径（2026-11-09 定稿）**
 
-- 阶段 A（$f_2\times f_4$，$q=10\times8$）产出 ≥ 20 个非支配解
-- 阶段 B 相对阶段 A 的新增非支配点 < 5% 时，记录「$f_0\ge19$ 对本实例无实质收益」
-- 每个点都满足 $f_k\le\varepsilon_k$（$k\ne1$）
-- 前沿中不存在被支配点
-- 验证 $f_3$ 始终等于 $f_0$ 对应的结构最小值（诊断断言）
-- 全扫描在 15 分钟内完成（B=20，n≤200）
-- 输出六维目标值 + 成对投影图数据
+1. **归一化锚点用 PURE**（`payoff["ideal"]` / `payoff["nadir"]`），不用 practical。这样 HV/拐点的数值绑在实例本身，不随"这一轮扫了哪个 practical 网格"漂移，两次扫描才可比。网格边界才用 practical（`practical_ideal` / `practical_nadir`）。
+2. **只对本次扫描真正探索的目标算质量**：`quality_objectives = ["wait"] + 实际启用的 ε 轴`。把六目标全算进去，会让一条被压缩的轴（如 occupancy 只在 guard 带 18–20 内变化）与真正被权衡的轴等权，从而劫持拐点选择。
+3. **拐点平面必须含 pivot**：`knee_pivot="wait"`。三目标以上时"拐点"本质是二维概念；按"跨度最大两轴"自动选平面会在 `zone_mismatch` 跨度大于 `wait` 时把 pivot 挤出平面，选出与"ε 换来了多少 $f_1$"无关的点。
+4. **拐点端点按第一轴全域取最小/最大**，不用字典序 `argmax`。后者可能返回两个几乎重合的点，弦长塌缩到 0.14 而垂距 0.67，`prominence` 虚高到 4.67。
+5. **拐点必须报"显著度"**：`prominence` = 垂距 / 弦长，门槛 `KNEE_MIN_PROMINENCE = 0.02`。低于门槛时 `knee_source=None` 而不是硬报一个点。ε 扫描的常见形态就是一条直线（每档 ε 换固定量的 $f_1$），直线前沿**没有拐点**，硬报出来的只是采样间距的产物。
+
+**验收（阶段 A，2026-11-09 实跑）**
+
+命令：
+
+```powershell
+$env:PYTHONPATH = (Get-Location)
+.\.venv\Scripts\python.exe -u -m application.run_timed_pareto --input artifacts/sofa_sample/sofa_sample.json `
+  --output reports/rolling/p4_dense_grid.json --sample-size 50 --beds 20 --steps 12 --seed 42 `
+  --axis-levels overload=10,zone_mismatch=8 --max-time 3
+```
+
+| 验收项 | 结果 |
+|--------|------|
+| 阶段 A 产出 ≥ 20 个非支配解 | ✅ 每步 7–14，13 步合计 **139** 个 |
+| 每个点满足 $f_k\le\varepsilon_k$ | ✅ 逐点断言通过 |
+| 前沿中不存在被支配点 | ✅ `_front` 过滤后 139 点全非支配 |
+| 网格规模 | 48–80 点/步（受 guard 下限裁剪，可行 48–80，几乎不丢点） |
+| 非支配比 | 0.088–0.25 |
+| 超体积（归一化，PURE 锚点，ref=$-0.05$） | 0.6614–0.9170，均值 **0.8205** |
+| 有显著拐点的步数 | **9/13**；其余 4 步（2、3、5、9）前沿在 $(f_1,f_2)$ 平面上是直线，按门槛正确报 `None` |
+| $f_3$ 结构断言 | ✅ 全程 0，与 $f_0=20$、5 区 × 4 床的结构最小值一致 |
+| 患者守恒 | ✅ 13/13 步 `patient_conservation: true` |
+| 总耗时 | 每步 `--max-time 3` 上限内，全扫描分钟级 |
+| 输出 | 六维目标值 + 每点 ε 边界 + 每步 payoff 表，落在 `reports/rolling/p4_dense_grid.json`（Git 忽略） |
+
+**主要发现**
+
+- **$f_1 \leftrightarrow f_2$ 存在真实的单调权衡**：放松过载上限能换到更高优先级服务量。step 0 从 $f_2=41\Rightarrow f_1=22100$ 一直走到 $f_2=149\Rightarrow f_1=34900$，几乎严格线性——这正是"每档 ε 换固定量 $f_1$"的形态，也解释了为什么那一步的 prominence 只有 0.056。
+- **拐点普遍落在 $\varepsilon_2$ 第 2 档**（9 步里 7 步是 `epsilon:2`）：相对执行值只让出 1.5%–3% 的 $f_1$，却把 $f_2$ 从执行值压到接近 ideal。这是给 P7 "推荐方案"最有用的输出。
+- **$f_5$ 全程为 0**：稠密 ε 网格里挪床从未被选中，与 P6 的结论一致——"不动床"本身就是加权意义上的最优，不是 λ 没调好。
+
+**未做/留待后续**
+
+- 阶段 B（加 $f_0$ 轴）：需先扩 `_epsilon_grid`。
+- `AddHint`、多进程：见上，主动跳过。
+- **转出（$x^{out}$）未启用**：本轮扫描 `sofa_transfer_max=None`。原因见下方"f5 修改对扫描的影响"，转出会改变可行集与网格边界，需与 P7 的同池（$B_{pool}$）评估协议一起做，否则数字不可比。
+- 拐点/超体积目前是"每步独立"的，跨步的整条轨迹质量（如逐步 HV 累积）留 P7。
+
+### P4 补记：$f_4$ 计数口径修正（2026-11-09）
+
+**问题**：$f_4$ 在实测中恒在 0–3 之间，且能被零成本压到 0，导致它在 Pareto 分析里几乎不携带信息，也连带使 $f_5$ 永远没有值得付费的对手（价格扫描见下）。
+
+**根因**（三条口径叠加，详见 `MULTIOBJECTIVE_THEORY.md` §3.5）：
+
+| 口径 | 修正 |
+|---|---|
+| 6 例 Intermediate 单元未进 `_careunit_zone` → 返回 0 → `_zone_mismatch` 中 `if pz <= 0: continue` **静默跳过** | `Neuro Intermediate → NICU`、`Surgery/Vascular/Intermediate → SICU`、其余 Intermediate → MICU |
+| `isolation.mode: none` 时 4 张 ISO 床对**所有患者**算匹配（万能位） | 仅 `iso_flags[i]` 为真时算匹配 |
+| `_bound_zone_mismatch` 固定 `n_beds` | 映射修正后实际计数人数 = `n_beds`，上界变精确 |
+
+**验收（四条判据）**
+
+| 判据 | 结果 |
+|---|---|
+| 1. $f_4$ 下限 > 0 | ✅ 执行解 4–6；理论下限 4（CCU 溢出 2 + SICU 1 + MICU 1） |
+| 2. $f_4$ 随 $\varepsilon_4$ 单调变化 | ✅ 前沿单步取值 4–13（修正前恒 0–1） |
+| 3. NICU 出现竞争 | ✅ step 0 首选 NICU 4 人 vs 4 床，正好饱和；ISO 4 床被三个区的溢出者占满 |
+| 4. $f_4$ 与 $f_5$ 出现权衡 | ⚠️ 仅 step 1 一步（move=0 时 $f_4$=5，挪床可到 4）。$f_5$ 仍近乎退化 |
+
+**实测影响**（`--axis-levels overload=10,zone_mismatch=8`，x_out 关闭）
+
+| 指标 | 修正前 | 修正后 |
+|---|---|---|
+| 累计 $f_4$ | 11 | **67** |
+| 累计 $f_1$ | 431,200 | 425,800（−1.25%，更多优先给病区匹配） |
+| 累计 $f_2$ | 1,712 | 1,658 |
+| 非支配点合计 | 139 | 159 |
+| HV 均值 | 0.8205 | 0.3074（**不可比**，归一化基准变了） |
+| 有显著拐点步数 | 9/13 | 9/13 |
+
+**新出现的权衡**：前沿里出现 occupancy = 18 的点（guard 下限）。原因是「不收入某个患者」可以让他的错配不计数，于是 $f_0\downarrow$ 换 $f_4\downarrow$。这是修正后才显形的真实权衡，之前被 ISO 万能位掩盖。
+
+**须随结果声明的假设**：首选病区取自 `first_careunit`（"从哪来回哪去"，不是"按病情该去哪"）；Intermediate → 上级重症单元是映射约定而非临床结论。
+
+**未做（已判定不值得）**：$f_4$/$f_5$ 的 SOFA 严重度加权（L2）。判定依据：
+
+1. 同比例缩放两个权重是恒等变换——净收益变成 $s_i(\lambda_4-\lambda_5)10^6/B$，比值不变。
+2. 修正前 $f_4$ 可零成本到 0，加权无对象；修正后下限已由床位容量结构决定，加权改不了上限。
+3. 实测：$\lambda_{\text{move}}$ 从 0.5 扫到 0.02，加权和总挪床数 0→1；$\lambda_{\text{zone}}$ 提到 move 单价的 10–100 倍，$f_4$ 可到 0 而 $f_5$ 仍恒为 0（改善全部走"新患者安置不计入 $f_5$"和"转出"这两条免费通道）。
+|------|----------|----------|
+| 网格边界变化的步数 | — | 12/13 |
+| 可行点数合计 | 89 | 80 |
+| 前沿点数合计 | 49 | 43 |
+| 前沿目标向量 | — | 多数步与关闭时**不相交** |
+
+另有两点语义影响必须记录：
+
+1. 转出患者不再计入 $f_5$，等于给"腾床"提供了一条零成本路径，**削弱了 $\varepsilon_5$ 的约束力**。
+2. 转出会让患者永久离开候选池，产生**池效应**（$B_{pool}$）：关/开两次运行的候选池不同，逐步差值是"策略差异 + 池差异"的混合量。
+
+因此本轮 P4 结论统一在**转出关闭**下给出，保持与既有报告可比；转出效果作为 P7 的独立实验（同池重评估）处理。
+
 
 ---
 

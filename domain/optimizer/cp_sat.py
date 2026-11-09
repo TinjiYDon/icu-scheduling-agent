@@ -75,7 +75,16 @@ def _snapshot_stays(rows: Sequence[Mapping[str, object]]) -> list[dict]:
 
 
 def _careunit_zone(careunit: str | None) -> int:
-    """Map careunit to bed zone index. 0=unknown, 1=MICU, 2=SICU, 3=CCU, 4=NICU."""
+    """Map careunit to bed zone index. 0=unknown, 1=MICU, 2=SICU, 3=CCU, 4=NICU.
+
+    Intermediate-care units are mapped to the critical-care unit they step down
+    from, because MIMIC's icustays table includes them and leaving them
+    unmapped silently removed them from the zone-mismatch objective: 6 of the 50
+    sample stays fell into that hole, which (a) made f4 blind to 12% of the
+    cohort and (b) left the 4 configured NICU beds with no competition at all.
+    This is a mapping convention, not a clinical finding -- see
+    MULTIOBJECTIVE_THEORY.md.
+    """
     if not careunit:
         return 0
     cu = careunit.lower()
@@ -87,6 +96,13 @@ def _careunit_zone(careunit: str | None) -> int:
         return 3
     if any(kw in cu for kw in ("nicu", "nsicu")):
         return 4
+    # Intermediate-care / step-down units: assign to the parent critical-care unit.
+    if any(kw in cu for kw in ("neuro", "neurology", "neurosurgery")):
+        return 4
+    if any(kw in cu for kw in ("surgery/vascular", "vascular", "surgical intermediate")):
+        return 2
+    if "intermediate" in cu:
+        return 1
     return 0
 
 

@@ -5,7 +5,12 @@ from copy import deepcopy
 import pytest
 
 from domain.optimizer.pareto import OBJECTIVE_KEYS
-from domain.rolling.timed_pareto import _epsilon_grid, asof_score, run_timed_pareto
+from domain.rolling.timed_pareto import (
+    _epsilon_grid,
+    asof_score,
+    quality_objective_names,
+    run_timed_pareto,
+)
 
 
 def payload(n=4):
@@ -308,3 +313,185 @@ def test_epsilon_grid_default_mode_is_the_full_cartesian_product():
     assert {g["move"] for g in grid} == {0, 8}
     assert {g["overload"] for g in grid} == {10, 40}
     assert {g["zone_mismatch"] for g in grid} == {0, 12}
+
+
+def test_epsilon_grid_asymmetric_level_map_builds_the_p4_grid():
+    payoff = {
+        "practical_ideal": {"overload": 10, "zone_mismatch": 0, "move": 0},
+        "practical_nadir": {"overload": 145, "zone_mismatch": 12, "move": 19},
+        "guard": {"occupancy_min": 18},
+    }
+    grid = _epsilon_grid(
+        payoff, levels=2, level_map={"overload": 10, "zone_mismatch": 8}
+    )
+    # The P4 stage-A grid is exactly 10 x 8 = 80 points per decision step.
+    assert len(grid) == 80
+    assert {g["overload"] for g in grid} == {
+        10, 25, 40, 55, 70, 85, 100, 115, 130, 145
+    }
+    assert len({g["zone_mismatch"] for g in grid}) == 8
+    # An omitted axis must not appear: pinning a minimised objective at its
+    # ideal would silently turn it into a hard constraint.
+    assert all("move" not in g for g in grid)
+    assert all(g["occupancy"] == 18 for g in grid)
+
+
+def test_epsilon_grid_level_map_drops_axes_marked_one():
+    payoff = {
+        "practical_ideal": {"overload": 10, "zone_mismatch": 0, "move": 0},
+        "practical_nadir": {"overload": 40, "zone_mismatch": 12, "move": 8},
+        "guard": {"occupancy_min": 18},
+    }
+    grid = _epsilon_grid(
+        payoff, levels=2, level_map={"overload": 3, "zone_mismatch": 1}
+    )
+    assert len(grid) == 3
+    assert all(set(g) == {"occupancy", "overload"} for g in grid)
+
+
+def test_epsilon_grid_rejects_unknown_axis():
+    payoff = {
+        "practical_ideal": {"overload": 10, "zone_mismatch": 0, "move": 0},
+        "practical_nadir": {"overload": 40, "zone_mismatch": 12, "move": 8},
+        "guard": {"occupancy_min": 18},
+    }
+    with pytest.raises(ValueError, match="unknown grid objective"):
+        _epsilon_grid(payoff, levels=2, level_map={"occupancy": 4})
+
+
+def test_scan_records_hypervolume_and_knee():
+    report = run_timed_pareto(
+        payload(),
+        solve=Solver(),
+        n_beds=2,
+        n_steps=2,
+        admission_rate=0,
+        discharge_rate=0,
+        levels=2,
+    )
+    scans = [h["epsilon_scan"] for h in report["history"] if h.get("epsilon_scan")]
+    assert scans
+    for scan in scans:
+        assert "hypervolume" in scan and scan["hypervolume"] >= 0.0
+        assert "nondominated_ratio" in scan
+        assert 0.0 <= scan["nondominated_ratio"] <= 1.0
+        assert "knee_index" in scan
+        if scan["knee_index"] is not None:
+            assert scan["knee_source"] is not None
+
+
+def test_replay_accepts_asymmetric_axis_levels():
+    report = run_timed_pareto(
+        payload(),
+        solve=Solver(),
+        n_beds=2,
+        n_steps=1,
+        admission_rate=0,
+        discharge_rate=0,
+        level_map={"overload": 3, "zone_mismatch": 2},
+    )
+    assert report["config"]["level_map"] == {"overload": 3, "zone_mismatch": 2}
+    scan = report["history"][0]["epsilon_scan"]
+    assert scan["level_map"] == {"overload": 3, "zone_mismatch": 2}
+    assert all("move" not in g for g in scan["grid"])
+
+
+def test_replay_rejects_level_map_without_active_axis():
+    with pytest.raises(ValueError):
+        run_timed_pareto(
+            payload(),
+            solve=Solver(),
+            n_beds=2,
+            n_steps=1,
+            level_map={"overload": 1},
+        )
+
+
+def test_max_moves_reaches_every_sub_solve():
+    """A move budget must constrain the anchors and the scan, not just one call.
+
+    The payoff anchors set the grid bounds, so if the budget only reached the
+    reference solve the swept points would silently ignore it.
+    """
+    solver = Solver()
+    report = run_timed_pareto(
+        payload(),
+        solve=solver,
+        n_beds=2,
+        n_steps=1,
+        admission_rate=0,
+        discharge_rate=0,
+        levels=2,
+        max_moves=3,
+    )
+    assert report["config"]["max_moves"] == 3
+    assert solver.calls
+    assert all(call["max_moves"] == 3 for call in solver.calls)
+
+
+def test_max_moves_defaults_to_unbounded():
+    solver = Solver()
+    report = run_timed_pareto(
+        payload(),
+        solve=solver,
+        n_beds=2,
+        n_steps=0,
+        admission_rate=0,
+        discharge_rate=0,
+        levels=2,
+    )
+    assert report["config"]["max_moves"] is None
+    assert all(call["max_moves"] is None for call in solver.calls)
+
+
+def test_replay_rejects_negative_max_moves():
+    with pytest.raises(ValueError, match="max_moves"):
+        run_timed_pareto(
+            payload(),
+            solve=Solver(),
+            n_beds=2,
+            n_steps=0,
+            max_moves=-1,
+        )
+
+
+def test_move_joins_quality_objectives_only_when_the_front_trades_it():
+    """f5 is scored when it varies, and left out when it is constant.
+
+    A constant column would multiply every hypervolume by a fixed factor without
+    carrying information, which would make two scans incomparable for no reason.
+    """
+    grid = [{"occupancy": 18, "overload": 130, "zone_mismatch": 2}]
+
+    constant = [
+        {"wait": 30000, "overload": 130, "zone_mismatch": 1, "move": 0},
+        {"wait": 31000, "overload": 131, "zone_mismatch": 0, "move": 0},
+    ]
+    assert quality_objective_names(grid, constant) == [
+        "wait",
+        "overload",
+        "zone_mismatch",
+    ]
+
+    traded = [
+        {"wait": 30000, "overload": 130, "zone_mismatch": 2, "move": 0},
+        {"wait": 30000, "overload": 130, "zone_mismatch": 0, "move": 3},
+    ]
+    assert quality_objective_names(grid, traded) == [
+        "wait",
+        "overload",
+        "zone_mismatch",
+        "move",
+    ]
+
+
+def test_quality_objectives_include_every_active_axis_even_if_constant():
+    # An axis the sweep pins is still part of the design, so it is always scored.
+    grid = [{"occupancy": 18, "overload": 130, "zone_mismatch": 2, "move": 2}]
+    values = [{"wait": 30000, "overload": 130, "zone_mismatch": 2, "move": 2}]
+    assert quality_objective_names(grid, values) == [
+        "wait",
+        "overload",
+        "zone_mismatch",
+        "move",
+    ]

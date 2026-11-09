@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from domain.optimizer.cp_sat import AssignmentSolveError, run_assignment
+from domain.optimizer.front_metrics import summarize_front
 from domain.optimizer.objectives import OBJECTIVES
 from domain.optimizer.pareto import objective_vector, solve_anchors
 from infra.config import load_yaml
@@ -109,53 +110,78 @@ def _replay_resources(configured: Mapping[str, Any], n_beds: int) -> dict:
     return result
 
 
+def _axis_values(payoff: Mapping[str, Any], name: str, levels: int) -> list[int]:
+    """Direction-aware epsilon levels for one minimised axis, ideal -> nadir."""
+    best = payoff["practical_ideal"][name]
+    worst = payoff["practical_nadir"][name]
+    # All scan axes are minimised; round the upper bounds outward.
+    return sorted(
+        {math.ceil(best + j * (worst - best) / (levels - 1)) for j in range(levels)}
+    )
+
+
 def _epsilon_grid(
     payoff: Mapping[str, Any],
     levels: int,
     *,
     move_levels: int | None = None,
+    level_map: Mapping[str, int] | None = None,
 ) -> list[dict[str, int]]:
     """Build the epsilon grid for one decision step.
 
-    Default mode sweeps all of ``GRID_OBJECTIVES`` with the same ``levels``.
-    ``move_levels`` switches to a dense 1-D scan on ``move``: only the occupancy
-    floor and the f5 cap are constrained, so f5 is the single swept quantity.
+    Three modes, in order of precedence:
 
-    The other two axes are deliberately *omitted* rather than pinned at their
-    practical ideal.  Pinning ``zone_mismatch`` at its ideal value turns a soft
-    objective into a hard "every patient in its preferred zone" constraint,
-    which caps occupancy and makes the sweep measure the wrong thing.
+    ``level_map``
+        Asymmetric grid: one level count per axis, e.g.
+        ``{"overload": 10, "zone_mismatch": 8}``.  Axes mapped to ``1`` are
+        **omitted** rather than pinned at their practical ideal -- pinning a
+        minimised objective at its ideal value turns it into a hard constraint
+        and distorts the sweep.  This is the mode the P4 acceptance needs
+        ($f_2^{10}\\times f_4^{8}$ = 80 points per step).
+    ``move_levels``
+        Dense 1-D scan on ``move`` with the occupancy floor only.
+        ``f5 <= n_beds``, so a small q already saturates the resolution.
+    ``levels``
+        Symmetric grid over every axis in ``GRID_OBJECTIVES``.
 
-    Note that f5 is bounded by the bed count, not by the candidate pool, so a
-    small q already saturates the reachable resolution.
+    The occupancy floor from the practical anchors is always applied.
     """
     floor = payoff["guard"]["occupancy_min"]
+
+    if level_map is not None:
+        if not level_map:
+            raise ValueError("level_map must not be empty")
+        unknown = set(level_map) - set(GRID_OBJECTIVES)
+        if unknown:
+            raise ValueError(
+                f"unknown grid objective(s): {', '.join(sorted(unknown))}"
+            )
+        active: list[str] = []
+        axes: list[list[int]] = []
+        for name in GRID_OBJECTIVES:
+            q = int(level_map.get(name, 1))
+            if q <= 1:
+                continue
+            active.append(name)
+            axes.append(_axis_values(payoff, name, q))
+        if not axes:
+            raise ValueError("level_map must enable at least one axis with levels > 1")
+        return [
+            {"occupancy": floor, **dict(zip(active, bounds, strict=True))}
+            for bounds in product(*axes)
+        ]
+
     if move_levels is not None:
         if move_levels < 2:
             raise ValueError("move_levels must be >= 2")
-        best = payoff["practical_ideal"]["move"]
-        worst = payoff["practical_nadir"]["move"]
-        cap_values = sorted(
-            {
-                math.ceil(best + j * (worst - best) / (move_levels - 1))
-                for j in range(move_levels)
-            }
-        )
-        return [{"occupancy": floor, "move": cap} for cap in cap_values]
+        return [
+            {"occupancy": floor, "move": cap}
+            for cap in _axis_values(payoff, "move", move_levels)
+        ]
 
-    axes = []
-    for name in GRID_OBJECTIVES:
-        best = payoff["practical_ideal"][name]
-        worst = payoff["practical_nadir"][name]
-        # All scan axes are minimized; round upper bounds outward.
-        axes.append(
-            sorted(
-                {
-                    math.ceil(best + j * (worst - best) / (levels - 1))
-                    for j in range(levels)
-                }
-            )
-        )
+    if levels < 2:
+        raise ValueError("levels must be >= 2")
+    axes = [_axis_values(payoff, name, levels) for name in GRID_OBJECTIVES]
     return [
         {"occupancy": floor, **dict(zip(GRID_OBJECTIVES, bounds, strict=True))}
         for bounds in product(*axes)
@@ -171,6 +197,36 @@ def _dominates(left: Mapping[str, float], right: Mapping[str, float]) -> bool:
         )
         for name, spec in OBJECTIVES.items()
     )
+
+
+def quality_objective_names(
+    grid: Sequence[Mapping[str, int]],
+    front_values: Sequence[Mapping[str, int]],
+) -> list[str]:
+    """Objectives a front's quality (hypervolume / knee) should be scored on.
+
+    The pivot, plus whichever epsilon axes the grid actually sweeps, plus any
+    other objective the front genuinely trades.
+
+    Scoring every objective would let a compressed axis carry the same weight as
+    a genuinely traded one -- occupancy only moves inside the guard band (e.g.
+    18..20) yet would dominate the knee choice.  Conversely, an axis the solver
+    is free to churn on (``move`` when no budget is in force) produces front
+    points that differ only in that axis; leaving it out rates a 19-move plan
+    and a 0-move plan identically.  A column that is constant across the whole
+    front is dropped because it carries no information and would only rescale
+    every hypervolume by a fixed factor.
+    """
+    names = ["wait"]
+    first = grid[0] if grid else {}
+    for name in GRID_OBJECTIVES:
+        if name in first:
+            names.append(name)
+            continue
+        column = [v[name] for v in front_values if name in v]
+        if column and max(column) - min(column) >= 1:
+            names.append(name)
+    return names
 
 
 def _front(points: list[dict]) -> list[dict]:
@@ -202,12 +258,14 @@ def run_timed_pareto(
     discharge_rate: float = 0.05,
     levels: int = 2,
     move_levels: int | None = None,
+    level_map: Mapping[str, int] | None = None,
     occupancy_ratio: float = 0.9,
     max_time_seconds: float = 3.0,
     retain_occupied: bool = True,
     sofa_transfer_max: float | None = None,
     min_icu_hours: int = 24,
     max_transfers: int | None = None,
+    max_moves: int | None = None,
     progress: Callable[[dict], None] | None = None,
 ) -> dict:
     """Run t=0 initial fill plus at most twelve two-hour transitions.
@@ -225,10 +283,20 @@ def run_timed_pareto(
         raise ValueError("Use a 2h decision step, nonnegative warmup, and levels>=2")
     if move_levels is not None and move_levels < 2:
         raise ValueError("move_levels must be >= 2 when provided")
+    if level_map is not None:
+        unknown = set(level_map) - set(GRID_OBJECTIVES)
+        if unknown:
+            raise ValueError(
+                f"unknown grid objective(s): {', '.join(sorted(unknown))}"
+            )
+        if all(int(q) <= 1 for q in level_map.values()):
+            raise ValueError("level_map needs at least one axis above 1")
     if min_icu_hours < 0:
         raise ValueError("min_icu_hours must be nonnegative")
     if max_transfers is not None and max_transfers < 0:
         raise ValueError("max_transfers must be nonnegative")
+    if max_moves is not None and max_moves < 0:
+        raise ValueError("max_moves must be nonnegative")
     if not 0 <= occupancy_ratio <= 1 or not all(
         0 <= r <= 1 for r in (admission_rate, discharge_rate)
     ):
@@ -387,6 +455,7 @@ def run_timed_pareto(
                 retain_occupied=retain_occupied,
                 transferable=list(_transferable),
                 max_transfers=max_transfers,
+                max_moves=max_moves,
                 **kwargs,
             )
             if result.get("solver_status") not in FEASIBLE:
@@ -435,7 +504,9 @@ def run_timed_pareto(
         # Anchor run IDs are ephemeral and do not affect this replay.
         payoff.pop("run_id")
         occupancy_floor = payoff["guard"]["occupancy_min"]
-        grid = _epsilon_grid(payoff, levels, move_levels=move_levels)
+        grid = _epsilon_grid(
+            payoff, levels, move_levels=move_levels, level_map=level_map
+        )
         points = []
         for idx, bounds in enumerate(grid, start=1):
             try:
@@ -467,14 +538,55 @@ def run_timed_pareto(
                 )
             points.append(point)
         front = _front(points)
+        # Front quality uses the PURE anchors for normalisation (P3 decision:
+        # normalise on the mathematical ideal/nadir) so the numbers stay tied to
+        # the instance rather than to whichever practical grid was swept.
+        #
+        # Only the objectives this scan actually explores are scored: the pivot
+        # plus whichever epsilon axes are active.  Including every objective
+        # would let a compressed axis (occupancy only spans the guard band, e.g.
+        # 18..20) carry the same weight as a genuinely traded one and dominate
+        # the knee choice.
+        #
+        # ``move`` joins the set when the front genuinely trades it (see
+        # quality_objective_names for why both inclusion and exclusion matter).
+        front_values = [dict(p["values"]) for p in front if p["values"]]
+        quality_names = quality_objective_names(grid, front_values)
+        quality_senses = {
+            name: OBJECTIVES[name].sense for name in quality_names if name in OBJECTIVES
+        }
+        quality = summarize_front(
+            front_values,
+            ideal=payoff.get("ideal") or {},
+            nadir=payoff.get("nadir") or {},
+            senses=quality_senses,
+            # The scan trades the pivot away for epsilon room, so the knee plane
+            # must contain the pivot; the other axis is whichever constraint is
+            # actually moving the front.
+            knee_pivot="wait",
+        )
+        knee_index = quality["knee_index"]
         scan = {
             "primary": "wait",
             "grid_objectives": list(GRID_OBJECTIVES),
+            "quality_objectives": quality_names,
+            "max_moves": max_moves,
             "levels": levels,
             "move_levels": move_levels,
+            "level_map": dict(level_map) if level_map else None,
             "n_grid": len(grid),
             "n_feasible": sum(p["status"] in FEASIBLE for p in points),
             "n_nondominated": len(front),
+            "nondominated_ratio": round(
+                len(front) / max(1, sum(p["status"] in FEASIBLE for p in points)), 4
+            ),
+            "hypervolume": quality["hypervolume"],
+            "knee_index": knee_index,
+            "knee_prominence": quality["knee_prominence"],
+            "knee_axes": quality["knee_axes"],
+            "knee_source": (
+                front[knee_index]["source"] if knee_index is not None else None
+            ),
             "grid": grid,
             "points": points,
         }
@@ -586,12 +698,14 @@ def run_timed_pareto(
             "discharge_rate": discharge_rate,
             "levels": levels,
             "move_levels": move_levels,
+            "level_map": dict(level_map) if level_map else None,
             "grid_objectives": list(GRID_OBJECTIVES),
             "occupancy_ratio": occupancy_ratio,
             "retain_occupied": retain_occupied,
             "sofa_transfer_max": sofa_transfer_max,
             "min_icu_hours": min_icu_hours,
             "max_transfers": max_transfers,
+            "max_moves": max_moves,
             "solver_seed": 0,
             "max_time_seconds": max_time_seconds,
             "constraint_modes": {
@@ -627,6 +741,12 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--levels", type=int, default=2)
     parser.add_argument(
+        "--axis-levels",
+        default=None,
+        help="asymmetric dense grid, e.g. 'overload=10,zone_mismatch=8'. "
+        "Axes omitted (or set to 1) are not constrained; this is the P4 mode",
+    )
+    parser.add_argument(
         "--move-levels",
         type=int,
         default=None,
@@ -653,7 +773,23 @@ def main() -> None:
         default=None,
         help="hard cap on transfers per step; a constraint, not an objective",
     )
+    parser.add_argument(
+        "--max-moves",
+        type=int,
+        default=None,
+        help="hard cap on bed moves (f5) per step; makes churn a controlled budget "
+        "instead of a free variable (default: unbounded)",
+    )
     args = parser.parse_args()
+    level_map = None
+    if args.axis_levels:
+        level_map = {}
+        for chunk in args.axis_levels.split(","):
+            chunk = chunk.strip()
+            if not chunk:
+                continue
+            name, _, q = chunk.partition("=")
+            level_map[name.strip()] = int(q)
     payload = json.loads(Path(args.input).read_text(encoding="utf-8"))
     report = run_timed_pareto(
         payload,
@@ -664,10 +800,12 @@ def main() -> None:
         seed=args.seed,
         levels=args.levels,
         move_levels=args.move_levels,
+        level_map=level_map,
         max_time_seconds=args.max_time,
         sofa_transfer_max=args.sofa_transfer_max,
         min_icu_hours=args.min_icu_hours,
         max_transfers=args.max_transfers,
+        max_moves=args.max_moves,
         progress=lambda row: print(json.dumps(row), flush=True),
     )
     output = Path(args.output)

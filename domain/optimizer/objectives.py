@@ -99,8 +99,12 @@ def _zone_mismatch(model, x, ctx: ModelContext):
 
         in_pref_zone = sum(x[i, b - 1] for b in range(pref_start, pref_start + pref_count))
         assigned_anywhere = sum(x[i, b] for b in range(ctx.n_beds))
-        if not ctx.iso_active or ctx.iso_flags[i]:
-            # ISO beds are ordinary (none) or a valid match for isolation patients
+        # Isolation beds only count as a match for a patient that needs one.
+        # They used to count for everybody while isolation mode was off, which
+        # turned 4 of the 20 beds into wildcards: any zone overflow could be
+        # parked there for free, so f4 could reach 0 without a single bed move
+        # and the objective carried no tension at all.
+        if ctx.iso_flags[i]:
             in_iso = sum(x[i, b] for b in range(ctx.n_iso_beds))
         else:
             in_iso = 0
