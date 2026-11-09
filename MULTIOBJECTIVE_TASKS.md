@@ -262,7 +262,7 @@ $env:PYTHONPATH = (Get-Location)
 | $f_4$ 病区失配 | **ε 维度 2** | 与 $f_1$ 中等冲突（0↔11），实用极差 11，可作为第二维展开二维前沿面 |
 | $f_0$ 占用 | **ε 维度 3（稀疏）** | 极差只有 2，但它是「多收一人」与「少收一人」的硬区别；取值 $\{18,19,20\}$ 三档即可 |
 | $f_3$ 负载偏差 | **从 ε 网格中剔除** | 已证明 $f_3$ 的最小值由 $f_0$ 唯一确定（见上节结论 3），不携独立信息；只作为可行性诊断量 |
-| $f_5$ 挪床 | **排除** | 无 `previous_beds` 时恒为 0，扫描无信息量；待 P8 滚动层接入后单独评估 |
+| $f_5$ 挪床 | **排除** | 无 `previous_beds` 时恒为 0，扫描无信息量；待 P6 滚动层接入后单独评估 |
 
 #### 为什么不用纯锚点范围做 ε
 
@@ -334,7 +334,7 @@ $$
 
 ## P5 结果持久化（预计半天）
 
-- [ ] 新增迁移 `migrations/004_pareto_solutions.sql`
+- [ ] 新增迁移 `migrations/005_pareto_solutions.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS sched.pareto_solutions (
@@ -361,45 +361,96 @@ CREATE TABLE IF NOT EXISTS sched.pareto_solutions (
 
 ---
 
-## P6 calib / eval 评估协议（预计半天）
+## P6 滚动层接入（预计 1–2 天）
 
-- [ ] 锚点与 ε 网格只在 **calib** 上确定（`split="calib"`）
-- [ ] **eval** 上只做前向评估，不调参
-- [ ] 对比基线：现行加权和（4 组 λ）+ 随机/贪心
-- [ ] 输出指标：HV、spacing、收治率、高危收治率、负载极差
+**目标**：让 $f_5$（挪床）从「恒为 0」变为真实有效维度，并把静态前沿接到滚动重解上。
+
+- [ ] `domain/rolling/engine.py` 每步调用 `run_assignment(previous_beds=<上一步分配>)`
+- [ ] 确认 $f_5$ 不再恒为 0（滚动第 2 步起有效）
+- [ ] 记录每步的 $f_5$ 与方案相似度（换床人数 / 两期共同患者数）
+- [ ] 每步重跑 P3 锚点（实例已变，标尺必须更新）
+- [ ] 输出滚动轨迹中的「稳定性—收益」曲线（逐步 $f_1$ vs $f_5$）
 
 **验收**
 
-- 生成 `reports/pareto/eval_summary.json`
-- 报告中明确写出"calib 调参、eval 报告"的实验协议
+- 跑完整 24h 仿真，$f_5$ 在第 2 步及之后取到非零值
+- 方案相似度指标可复现（同 seed 两次运行结果一致）
+- 能画出「换床数 ↑ 时 $f_1$ ↑」的权衡曲线，说明 $f_5$ 已进入前沿
 
 ---
 
-## P7 可选扩展目标（在上述六项之外）
+## P7 前沿质量检验（预计 2–3 天）
 
-六项目标集已固定；以下为后续可选增强，不与 $f_0$–$f_5$ 冲突时才考虑：
+**定位**：对齐 `origin/main` 文档的 **S4 前沿质量协议 / I1**。这一项是**前置方法学支撑**，不作为创新点主张（见 `docs/INNOVATION_PORTFOLIO.md` §S4）。
 
-- [ ] **公平性**：最小化等待时间基尼系数，或最大化最弱势组收治率
-- [ ] **峰值占用/超载风险**：$\min\max_d \text{occ}_d$ 或 CVaR
-- [ ] **方案稳定性**：$f_5$ 已有，可扩展为加权挪床距离
+> main 文档对当前状态的描述：「当前“前沿”= 81 点 ε 网格里的 4 个点；单实例、参考点自定、无统计检验；有效维度只有 2–3」。
+> 本阶段要回答三个不同层次的问题：**结果好不好**、**方法值不值得**、**结论可不可信**。
 
-**验收**
+### 7.1 前沿规模（回答“结果好不好”）
 
-- 每个新目标都有独立单测（构造小实例验证取值）
-- 加入后前沿维度增加，且 HV 单调不减
+- [ ] 扫描输出 `n_grid / n_feasible / n_nondominated`
+- [ ] 非支配率 $|F| / |F_{\text{feasible}}|$
+- [ ] spacing（Schott）：$\sqrt{\frac{1}{|F|-1}\sum_{i}(\bar d - d_i)^2}$，衡量间距均匀性
+- [ ] 跨 seed 汇总（均值 ± 95% CI）
+**为什么**：4 个点连曲线都画不出；且 VoF 公式里的 $\min_{x\in F}$ 会因前沿稀疏而被系统性低估。
 
----
+### 7.2 IGD（回答“前沿有没有漏区”）
 
-## P8 滚动层接入（预计 1–2 天）
+$$\text{IGD}(F, P^*) = \frac{1}{|P^*|}\sum_{p^*\in P^*}\min_{f\in F} d(p^*, f)$$
 
-- [ ] `domain/rolling/engine.py` 每步调用 `run_assignment(previous_beds=...)`
-- [ ] 记录每步的 $f_5$ 与方案相似度
-- [ ] 输出滚动轨迹中的"稳定性—收益"曲线
+- [ ] `igd(front, ref_front, ideal, nadir) -> float`（越小越好）
+- [ ] 参考前沿 $P^*$ = **全方法并集**再做一次非支配过滤（CP-SAT 稠密扫描 ∪ NSGA-II 存档 ∪ WS ∪ Lex）
+- [ ] **禁止**用单一方法自己的前沿当 $P^*$（循环论证）
+- [ ] 与 HV 使用同一套 ideal/nadir，避免口径不一致
 
-**验收**
+**为什么**：HV 只看“包住多少体积”，不惩罚中间空洞；IGD 从参考前沿逐点回看，能抓住“前沿某一段完全缺失”。
 
-- 跑完整 24h 仿真，$f_5$ 不再恒为 0
-- 方案相似度指标可复现
+### 7.3 NSGA-II 对照（回答“方法值不值得”）
+
+- [ ] 编码：解 = 患者的一个排列 $\pi$；解码 = 按 $\pi$ 顺序贪婪放床，**构造上保证满足硬约束**
+- [ ] 交叉：PMX（部分匹配交叉）；变异：两点交换
+- [ ] 封装 `pymoo` 的 `Problem`（变量 = 排列，目标 = 六项 $f_0$–$f_5$）
+- [ ] **同池、同 split、同时限**（与 CP-SAT 完全同一实例）
+- [ ] 对比维度：HV / IGD / 前沿规模 / 可行性违反数 / 耗时 / 是否可证明最优
+
+**为什么**：多目标优化的标准答案是 NSGA-II，且领域内最接近的工作（SciRep 2023 ICU 两阶段分床）用的就是 NSGA-II。不做对照就无法回答“为何不用标准方法”。
+
+**预期结论**：CP-SAT 每点可证明最优但前沿密度受网格限制；NSGA-II 密度高但无最优性保证。这是一个**真实的成本–质量权衡**，本身就是可写的结论。
+
+### 7.4 多场景 × 多 seed（回答“结论可不可信”）
+
+**场景（6 个，可直接复用 main 的 `moo_scenarios.SCENARIOS`）**
+
+| ID | 场景 | 变化 |
+|----|------|------|
+| S1_normal | 正常容量 | 20 床 / 4 ISO / 8 呼吸机 |
+| S2_bed_shortage | 总床位不足 | n_beds=12 |
+| S3_iso_shortage | 隔离床不足 | n_isolation_beds=1 |
+| S4_vent_shortage | 呼吸机不足 | n_ventilators=2 |
+| S5_high_sofa | 高 SOFA 集中 | 候选池 SOFA≥8 |
+| S6_zone_skew | 科室需求不均 | 候选池偏 MICU |
+
+**随机源（5 个 seed）**：候选池抽样、calib/eval 划分、CP-SAT tie-breaking、NSGA-II 初始化。
+
+- [ ] $6 \times 5 = 30$ 次实验，**配对设计**（同场景同 seed 下所有方法共用同一实例）
+- [ ] 锚点与 ε 网格只在 **calib** 上确定；**eval** 上只做前向评估，不调参
+- [ ] 报均值 ± 95% CI：$\bar x \pm 1.96\,s/\sqrt{n}$
+- [ ] 方法间比较用 **Wilcoxon 符号秩检验**（配对、不假设正态），报 p 值
+
+**规模**：$240\ \text{网格点} \times 6\ \text{场景} \times 5\ \text{seed} = 7200$ 次求解（仅 CP-SAT 部分）；单次 20–200 ms，串行 2.4–24 min，多进程可压到 1–3 min。
+
+### 7.5 验收
+
+| 指标 | 最低要求 |
+|------|----------|
+| 前沿规模 | 阶段 B 单场景单 seed 非支配点 ≥ 20；30 次实验报均值 ± CI |
+| HV | 已有精确实现（参考 main 的 `_hv_exact`）；跨 seed 报均值 ± CI |
+| IGD | 已实现且只用**全方法并集**作参考前沿；30 次均有值 |
+| NSGA-II | 能跑通、可行性违反 = 0（靠解码器保证）；产出 HV/IGD/规模/耗时四行对比表 |
+| 统计 | 方法与场景的热图表 + Wilcoxon p 值表 |
+| 闭环 | 若 IGD 显示某段空洞，需回到 P4 加密网格并重跑，直到不再改善 |
+
+**产出**：`reports/pareto/front_quality_<run_id>.json`（含 30 次原始指标、汇总、CI、p 值）+ 成对投影图数据。
 
 ---
 
@@ -416,6 +467,9 @@ $env:PYTHONPATH = (Get-Location)
 
 # 后续：Pareto 扫描（P4 完成后）
 .\.venv\Scripts\python.exe -m application.pareto --pivot wait --q 5
+
+# 后续：前沿质量检验（P7 完成后）
+.\.venv\Scripts\python.exe -m application.front_quality --scenarios all --seeds 5
 ```
 
 ## 附：文件改动地图
@@ -425,7 +479,6 @@ $env:PYTHONPATH = (Get-Location)
 | P1 | — | `domain/optimizer/cp_sat.py`、`configs/optimizer.yaml`、`tests/test_lambda_weights.py` |
 | P2 | `domain/optimizer/objectives.py` | `domain/optimizer/cp_sat.py` |
 | P3–P4 | `domain/optimizer/pareto.py` | — |
-| P5 | `data_access/pareto_repo.py`、`migrations/004_pareto_solutions.sql` | — |
-| P6 | — | `application/`（新增评估入口） |
-| P7 | — | `domain/optimizer/objectives.py` |
-| P8 | — | `domain/rolling/engine.py` |
+| P5 | `data_access/pareto_repo.py`、`migrations/005_pareto_solutions.sql` | — |
+| P6 | — | `domain/rolling/engine.py` |
+| P7 | `domain/optimizer/front_quality.py`、`domain/optimizer/nsga2.py`、`application/front_quality.py` | — |
