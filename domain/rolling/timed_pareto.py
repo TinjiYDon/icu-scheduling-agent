@@ -109,7 +109,40 @@ def _replay_resources(configured: Mapping[str, Any], n_beds: int) -> dict:
     return result
 
 
-def _epsilon_grid(payoff: Mapping[str, Any], levels: int) -> list[dict[str, int]]:
+def _epsilon_grid(
+    payoff: Mapping[str, Any],
+    levels: int,
+    *,
+    move_levels: int | None = None,
+) -> list[dict[str, int]]:
+    """Build the epsilon grid for one decision step.
+
+    Default mode sweeps all of ``GRID_OBJECTIVES`` with the same ``levels``.
+    ``move_levels`` switches to a dense 1-D scan on ``move``: only the occupancy
+    floor and the f5 cap are constrained, so f5 is the single swept quantity.
+
+    The other two axes are deliberately *omitted* rather than pinned at their
+    practical ideal.  Pinning ``zone_mismatch`` at its ideal value turns a soft
+    objective into a hard "every patient in its preferred zone" constraint,
+    which caps occupancy and makes the sweep measure the wrong thing.
+
+    Note that f5 is bounded by the bed count, not by the candidate pool, so a
+    small q already saturates the reachable resolution.
+    """
+    floor = payoff["guard"]["occupancy_min"]
+    if move_levels is not None:
+        if move_levels < 2:
+            raise ValueError("move_levels must be >= 2")
+        best = payoff["practical_ideal"]["move"]
+        worst = payoff["practical_nadir"]["move"]
+        cap_values = sorted(
+            {
+                math.ceil(best + j * (worst - best) / (move_levels - 1))
+                for j in range(move_levels)
+            }
+        )
+        return [{"occupancy": floor, "move": cap} for cap in cap_values]
+
     axes = []
     for name in GRID_OBJECTIVES:
         best = payoff["practical_ideal"][name]
@@ -123,7 +156,6 @@ def _epsilon_grid(payoff: Mapping[str, Any], levels: int) -> list[dict[str, int]
                 }
             )
         )
-    floor = payoff["guard"]["occupancy_min"]
     return [
         {"occupancy": floor, **dict(zip(GRID_OBJECTIVES, bounds, strict=True))}
         for bounds in product(*axes)
@@ -169,9 +201,13 @@ def run_timed_pareto(
     admission_rate: float = 0.05,
     discharge_rate: float = 0.05,
     levels: int = 2,
+    move_levels: int | None = None,
     occupancy_ratio: float = 0.9,
     max_time_seconds: float = 3.0,
     retain_occupied: bool = True,
+    sofa_transfer_max: float | None = None,
+    min_icu_hours: int = 24,
+    max_transfers: int | None = None,
     progress: Callable[[dict], None] | None = None,
 ) -> dict:
     """Run t=0 initial fill plus at most twelve two-hour transitions.
@@ -187,6 +223,12 @@ def run_timed_pareto(
         raise ValueError("Positive sample/beds and 0..12 transitions required")
     if step_hours != 2 or warmup_hours < 0 or levels < 2:
         raise ValueError("Use a 2h decision step, nonnegative warmup, and levels>=2")
+    if move_levels is not None and move_levels < 2:
+        raise ValueError("move_levels must be >= 2 when provided")
+    if min_icu_hours < 0:
+        raise ValueError("min_icu_hours must be nonnegative")
+    if max_transfers is not None and max_transfers < 0:
+        raise ValueError("max_transfers must be nonnegative")
     if not 0 <= occupancy_ratio <= 1 or not all(
         0 <= r <= 1 for r in (admission_rate, discharge_rate)
     ):
@@ -214,6 +256,7 @@ def run_timed_pareto(
     entry_hour = {sid: 0 for sid in waiting}
     occupied: dict[int, int] = {}
     discharged: set[int] = set()
+    transferred_total: set[int] = set()
     history: list[dict] = []
     solve = solve or run_assignment
     resources = _replay_resources(configured, n_beds)
@@ -293,6 +336,10 @@ def run_timed_pareto(
                     "waiting": [],
                     "pending": list(pending),
                     "discharged_total": sorted(discharged),
+                    "transferred": [],
+                    "transferred_total": sorted(transferred_total),
+                    "eligible_for_transfer": [],
+                    "n_eligible_transfer": 0,
                     "patient_conservation": True,
                     "f5_move": 0,
                     "common_patients": 0,
@@ -307,8 +354,27 @@ def run_timed_pareto(
                 progress({"step": step, "hour": hour, "status": "empty", "occupied": 0})
             continue
 
+        # Transfer-out eligibility: a clinical gate over as-of scores only, so no
+        # future information enters.  The transfer itself is a decision variable.
+        sofa_now = {ref["stay_id"]: float(ref["sofa_total"]) for ref in score_refs}
+        age_now = {ref["stay_id"]: int(ref["clinical_hour"]) for ref in score_refs}
+        if sofa_transfer_max is None:
+            eligible_transfer: list[int] = []
+        else:
+            eligible_transfer = sorted(
+                sid
+                for sid in predecision
+                if sofa_now.get(sid) is not None
+                and sofa_now[sid] <= float(sofa_transfer_max)
+                and age_now.get(sid, 0) >= int(min_icu_hours)
+            )
+
         def invoke(
-            *, _rows=candidate_rows, _previous=predecision, **kwargs: Any
+            *,
+            _rows=candidate_rows,
+            _previous=predecision,
+            _transferable=tuple(eligible_transfer),
+            **kwargs: Any,
         ) -> dict:
             kwargs.pop("persist", None)
             result = solve(
@@ -319,15 +385,24 @@ def run_timed_pareto(
                 max_time_seconds=max_time_seconds,
                 solver_seed=0,
                 retain_occupied=retain_occupied,
+                transferable=list(_transferable),
+                max_transfers=max_transfers,
                 **kwargs,
             )
             if result.get("solver_status") not in FEASIBLE:
                 return result
             values = objective_vector(result)
             amap = _assignments(result, {r["stay_id"] for r in _rows}, n_beds)
-            if retain_occupied and not set(_previous) <= set(amap):
+            stepped_down = {int(sid) for sid in (result.get("transferred") or [])}
+            if not stepped_down <= set(_transferable):
                 raise RuntimeError(
-                    "Solver removed an incumbent despite retain_occupied=True"
+                    "Solver transferred a patient outside the eligible set"
+                )
+            if not stepped_down <= set(_previous):
+                raise RuntimeError("Solver transferred a non-incumbent")
+            if retain_occupied and not set(_previous) <= (set(amap) | stepped_down):
+                raise RuntimeError(
+                    "Solver dropped an incumbent without transferring it out"
                 )
             moved = sum(
                 bed != _previous[sid] for sid, bed in amap.items() if sid in _previous
@@ -360,7 +435,7 @@ def run_timed_pareto(
         # Anchor run IDs are ephemeral and do not affect this replay.
         payoff.pop("run_id")
         occupancy_floor = payoff["guard"]["occupancy_min"]
-        grid = _epsilon_grid(payoff, levels)
+        grid = _epsilon_grid(payoff, levels, move_levels=move_levels)
         points = []
         for idx, bounds in enumerate(grid, start=1):
             try:
@@ -396,6 +471,7 @@ def run_timed_pareto(
             "primary": "wait",
             "grid_objectives": list(GRID_OBJECTIVES),
             "levels": levels,
+            "move_levels": move_levels,
             "n_grid": len(grid),
             "n_feasible": sum(p["status"] in FEASIBLE for p in points),
             "n_nondominated": len(front),
@@ -407,11 +483,19 @@ def run_timed_pareto(
         if values.get("move") != moved:
             raise RuntimeError("Reference f5 does not match predecision bed comparison")
         churn = moved / len(common) if common else 0.0
-        displaced = sorted(set(predecision) - set(assignments))
+        stepped_down = {int(sid) for sid in (reference.get("transferred") or [])}
+        transferred_total |= stepped_down
+        displaced = sorted(set(predecision) - set(assignments) - stepped_down)
         # Future discharges mutate live state, never the saved decision map.
         occupied = dict(assignments)
-        waiting = set(candidate_ids) - set(assignments)
-        parts = [set(pending), waiting, set(occupied), discharged]
+        waiting = set(candidate_ids) - set(assignments) - stepped_down
+        parts = [
+            set(pending),
+            waiting,
+            set(occupied),
+            transferred_total,
+            discharged,
+        ]
         conservation = set.union(*parts) == set(selected) and sum(
             map(len, parts)
         ) == len(selected)
@@ -436,6 +520,10 @@ def run_timed_pareto(
                 "similarity": 1.0 - churn,
                 "arrivals": arrivals,
                 "discharged": departed,
+                "transferred": sorted(stepped_down),
+                "transferred_total": sorted(transferred_total),
+                "eligible_for_transfer": eligible_transfer,
+                "n_eligible_transfer": len(eligible_transfer),
                 "displaced_to_waiting": displaced,
                 "waiting": sorted(waiting),
                 "pending": list(pending),
@@ -497,9 +585,13 @@ def run_timed_pareto(
             "admission_rate": admission_rate,
             "discharge_rate": discharge_rate,
             "levels": levels,
+            "move_levels": move_levels,
             "grid_objectives": list(GRID_OBJECTIVES),
             "occupancy_ratio": occupancy_ratio,
             "retain_occupied": retain_occupied,
+            "sofa_transfer_max": sofa_transfer_max,
+            "min_icu_hours": min_icu_hours,
+            "max_transfers": max_transfers,
             "solver_seed": 0,
             "max_time_seconds": max_time_seconds,
             "constraint_modes": {
@@ -534,7 +626,33 @@ def main() -> None:
     parser.add_argument("--warmup-hours", type=int, default=24)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--levels", type=int, default=2)
+    parser.add_argument(
+        "--move-levels",
+        type=int,
+        default=None,
+        help="dense 1-D scan on move (f5); pins the other epsilon axes at their "
+        "practical ideal to trace the stability-yield curve",
+    )
     parser.add_argument("--max-time", type=float, default=3.0)
+    parser.add_argument(
+        "--sofa-transfer-max",
+        type=float,
+        default=None,
+        help="enable transfer-out decisions: incumbents whose latest available "
+        "SOFA is <= this threshold become eligible (default: disabled)",
+    )
+    parser.add_argument(
+        "--min-icu-hours",
+        type=int,
+        default=24,
+        help="minimum clinical ICU hours before a patient may be transferred out",
+    )
+    parser.add_argument(
+        "--max-transfers",
+        type=int,
+        default=None,
+        help="hard cap on transfers per step; a constraint, not an objective",
+    )
     args = parser.parse_args()
     payload = json.loads(Path(args.input).read_text(encoding="utf-8"))
     report = run_timed_pareto(
@@ -545,7 +663,11 @@ def main() -> None:
         warmup_hours=args.warmup_hours,
         seed=args.seed,
         levels=args.levels,
+        move_levels=args.move_levels,
         max_time_seconds=args.max_time,
+        sofa_transfer_max=args.sofa_transfer_max,
+        min_icu_hours=args.min_icu_hours,
+        max_transfers=args.max_transfers,
         progress=lambda row: print(json.dumps(row), flush=True),
     )
     output = Path(args.output)

@@ -321,6 +321,10 @@ def run_assignment(
     solver_seed: int | None = None,
     max_time_seconds: float | None = None,
     resource_overrides: Mapping[str, object] | None = None,
+    max_moves: int | None = None,
+    max_moves_ratio: float | None = None,
+    transferable: Sequence[int] | None = None,
+    max_transfers: int | None = None,
 ) -> dict:
     """Run CP-SAT bed assignment.
 
@@ -343,6 +347,21 @@ def run_assignment(
         max_time_seconds: optional per-solve time limit (default 30 seconds).
         resource_overrides: optional per-solve resource config, including bed
             zones when changing the layout.
+        max_moves: hard upper bound on f5 (number of incumbent bed changes);
+            turns the rolling-stability objective into a constraint.
+        max_moves_ratio: alternative to ``max_moves``; the bound becomes
+            ``floor(ratio * common_patients)``, where common patients are the
+            stays present both in ``previous_beds`` and in the candidate pool.
+            ``max_moves`` takes precedence when both are given.
+        transferable: stay_ids allowed to be transferred out of the bed pool
+            this step.  Each must already hold a bed in ``previous_beds``, and
+            each gets a ``x_out`` decision variable.  When ``retain_occupied``
+            is set, an incumbent must then either keep a bed or be transferred
+            (``sum_b x_ib + x_out_i == 1``).
+        max_transfers: hard cap on the number of transfers per solve.  This is
+            a constraint, not an objective: without it the solver would step
+            down every eligible patient whenever a higher-priority patient is
+            waiting, because a transfer frees capacity at zero modelled cost.
     """
     if candidate_rows is not None:
         if persist:
@@ -391,6 +410,17 @@ def run_assignment(
     solver_time = float(30.0 if max_time_seconds is None else max_time_seconds)
     if not math.isfinite(solver_time) or solver_time <= 0:
         raise ValueError("max_time_seconds must be a finite positive number")
+    if max_moves is not None and int(max_moves) < 0:
+        raise ValueError("max_moves must be nonnegative")
+    if max_moves_ratio is not None and not 0 <= float(max_moves_ratio) <= 1:
+        raise ValueError("max_moves_ratio must lie in [0, 1]")
+    if max_transfers is not None and int(max_transfers) < 0:
+        raise ValueError("max_transfers must be nonnegative")
+    transfer_ids = {int(sid) for sid in (transferable or ())}
+    if transfer_ids - set(prev_bed):
+        raise ValueError(
+            "transferable stay_ids must already hold a bed in previous_beds"
+        )
     bed_zones_cfg = resources.get(
         "bed_zones",
         [[1, 4, "ISO"], [5, 4, "MICU"], [9, 4, "SICU"], [13, 4, "CCU"], [17, 4, "NICU"]],
@@ -666,15 +696,30 @@ def run_assignment(
         for b in range(n_beds):
             x[i, b] = model.NewBoolVar(f"x_{i}_{b}")
 
+    # Transfer-out decision: 1 iff an eligible incumbent leaves the bed pool.
+    x_out: dict[int, cp_model.IntVar] = {}
+    for i in range(n):
+        if stay_ids[i] in transfer_ids:
+            x_out[i] = model.NewBoolVar(f"x_out_{stay_ids[i]}")
+
     # Hard constraints: each bed ≤1 patient, each patient ≤1 bed
     for b in range(n_beds):
         model.Add(sum(x[i, b] for i in range(n)) <= 1)
     for i in range(n):
         bed_count = sum(x[i, b] for b in range(n_beds))
+        out_var = x_out.get(i)
         if retain_occupied and stay_ids[i] in prev_bed:
-            model.Add(bed_count == 1)
+            if out_var is not None:
+                # Retained incumbents keep a bed unless they are stepped down.
+                model.Add(bed_count + out_var == 1)
+            else:
+                model.Add(bed_count == 1)
         else:
             model.Add(bed_count <= 1)
+            if out_var is not None:
+                model.Add(out_var == 0)
+    if x_out and max_transfers is not None:
+        model.Add(sum(x_out.values()) <= int(max_transfers))
 
     # Isolation: isolation patients can only use isolation beds (first n_iso_beds)
     #            non-isolation patients cannot use isolation beds.
@@ -704,6 +749,15 @@ def run_assignment(
     coefficients = {
         name: _objective_coefficient(lam[name], bounds[name]) for name in lam
     }
+    # Optional hard cap on f5: stability as a constraint instead of a penalty.
+    move_limit: int | None = None
+    if max_moves is not None:
+        move_limit = int(max_moves)
+    elif max_moves_ratio is not None:
+        common_patients = len(set(prev_bed) & set(stay_ids))
+        move_limit = int(math.floor(float(max_moves_ratio) * common_patients))
+    if move_limit is not None:
+        model.Add(exprs["move"] <= move_limit)
     objective_mode = apply_objective(
         model,
         exprs,
@@ -746,6 +800,10 @@ def run_assignment(
                     "needs_iso": iso_flags[i],
                     "needs_vent": vent_flags[i],
                 })
+
+    transferred = sorted(
+        stays[i]["stay_id"] for i, var in x_out.items() if solver.Value(var) == 1
+    )
 
     # Tuning runs should not fill the production assignment table.
     if persist:
@@ -809,6 +867,14 @@ def run_assignment(
         "pivot": pivot,
         "epsilon": dict(epsilon or {}),
         "active_objectives": objective_mode.get("active"),
+        "max_moves": move_limit,
+        "max_moves_ratio": (
+            None if max_moves_ratio is None else float(max_moves_ratio)
+        ),
+        "transferable": sorted(transfer_ids),
+        "max_transfers": None if max_transfers is None else int(max_transfers),
+        "transferred": transferred,
+        "n_transferred": len(transferred),
         "split": split,
         "split_meta": split_meta,
         "objective_scaling": {

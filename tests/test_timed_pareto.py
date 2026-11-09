@@ -5,7 +5,7 @@ from copy import deepcopy
 import pytest
 
 from domain.optimizer.pareto import OBJECTIVE_KEYS
-from domain.rolling.timed_pareto import asof_score, run_timed_pareto
+from domain.rolling.timed_pareto import _epsilon_grid, asof_score, run_timed_pareto
 
 
 def payload(n=4):
@@ -143,7 +143,7 @@ def test_displaced_incumbent_returns_to_waiting_in_opt_in_research_mode():
 
 
 def test_incumbent_removal_is_rejected_by_default():
-    with pytest.raises(RuntimeError, match="removed an incumbent"):
+    with pytest.raises(RuntimeError, match="without transferring it out"):
         run_timed_pareto(
             payload(),
             solve=Solver(displace=True),
@@ -243,8 +243,68 @@ def test_disabled_demand_constraints_preserve_default_resources():
 
 
 @pytest.mark.parametrize(
-    "opts", [{"n_steps": 13}, {"step_hours": 4}, {"discharge_rate": -0.1}]
+    "opts",
+    [
+        {"n_steps": 13},
+        {"step_hours": 4},
+        {"discharge_rate": -0.1},
+        {"move_levels": 1},
+    ],
 )
 def test_invalid_protocol_parameters_fail(opts):
     with pytest.raises(ValueError):
         run_timed_pareto(payload(), solve=Solver(), **opts)
+
+
+def test_move_levels_sweeps_only_f5_and_pins_the_other_axes():
+    report = run_timed_pareto(
+        payload(),
+        solve=Solver(),
+        n_beds=2,
+        n_steps=2,
+        admission_rate=0,
+        discharge_rate=0,
+        move_levels=4,
+    )
+    assert report["config"]["move_levels"] == 4
+    for snapshot in report["history"]:
+        scan = snapshot.get("epsilon_scan")
+        if not scan:
+            continue
+        assert scan["move_levels"] == 4
+        grid = scan["grid"]
+        # Only ``move`` is swept; the other axes are omitted rather than pinned at
+        # their ideal value (pinning would turn soft objectives into hard ones).
+        for row in grid:
+            assert set(row) == {"occupancy", "move"}
+        assert len({row["occupancy"] for row in grid}) == 1
+        # No cartesian product is produced: one row per distinct move cap.
+        assert len(grid) == len({g["move"] for g in grid})
+
+
+def test_epsilon_grid_move_mode_spans_the_practical_range():
+    payoff = {
+        "practical_ideal": {"overload": 10, "zone_mismatch": 0, "move": 0},
+        "practical_nadir": {"overload": 40, "zone_mismatch": 12, "move": 8},
+        "guard": {"occupancy_min": 18},
+    }
+    grid = _epsilon_grid(payoff, levels=2, move_levels=5)
+    assert [g["move"] for g in grid] == [0, 2, 4, 6, 8]
+    assert all(g["occupancy"] == 18 for g in grid)
+    # ``overload`` / ``zone_mismatch`` are intentionally absent: constraining a
+    # soft objective at its ideal value would distort the sweep.
+    assert all("overload" not in g and "zone_mismatch" not in g for g in grid)
+
+
+def test_epsilon_grid_default_mode_is_the_full_cartesian_product():
+    payoff = {
+        "practical_ideal": {"overload": 10, "zone_mismatch": 0, "move": 0},
+        "practical_nadir": {"overload": 40, "zone_mismatch": 12, "move": 8},
+        "guard": {"occupancy_min": 18},
+    }
+    grid = _epsilon_grid(payoff, levels=2)
+    # 2 x 2 x 2 combinations, all axes swept.
+    assert len(grid) == 8
+    assert {g["move"] for g in grid} == {0, 8}
+    assert {g["overload"] for g in grid} == {10, 40}
+    assert {g["zone_mismatch"] for g in grid} == {0, 12}
