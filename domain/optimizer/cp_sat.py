@@ -5,16 +5,14 @@
 
 from __future__ import annotations
 
-import uuid
 import hashlib
 import math
-from typing import Mapping, Sequence
+import uuid
+from collections.abc import Mapping, Sequence
 
 from ortools.sat.python import cp_model
 from sqlalchemy import text
 
-from infra.config import load_yaml
-from infra.db import get_engine
 from domain.optimizer.eval_split import split_stay_ids
 from domain.optimizer.objectives import (
     OBJECTIVES,
@@ -22,9 +20,58 @@ from domain.optimizer.objectives import (
     apply_objective,
     build_objectives,
     objective_bounds,
+)
+from domain.optimizer.objectives import (
     zone_label as _zone_label,
 )
 from domain.scoring.priority import build_priority
+from infra.config import load_yaml
+from infra.db import get_engine
+
+
+class AssignmentSolveError(RuntimeError):
+    """CP-SAT returned no assignment, with its original status available."""
+
+    def __init__(self, solver_status: str):
+        self.solver_status = solver_status
+        super().__init__(f"CP-SAT failed: status={solver_status}")
+
+
+def _snapshot_stays(rows: Sequence[Mapping[str, object]]) -> list[dict]:
+    stays = []
+    seen: set[int] = set()
+    for row in rows:
+        try:
+            raw_sid = row["stay_id"]
+            sid = int(raw_sid)
+            sofa = float(row["sofa_total"])
+            priority = float(row["priority_weight"])
+        except (KeyError, TypeError, ValueError, OverflowError) as exc:
+            raise ValueError(
+                "candidate_rows requires numeric stay_id, sofa_total, and priority_weight"
+            ) from exc
+        if (
+            sid <= 0
+            or sid in seen
+            or isinstance(raw_sid, bool)
+            or (not isinstance(raw_sid, str) and raw_sid != sid)
+        ):
+            raise ValueError("candidate_rows must have unique positive integer stay_id")
+        if not sofa.is_integer() or not 0 <= sofa <= 24:
+            raise ValueError("candidate_rows sofa_total must be an integer in [0,24]")
+        if not math.isfinite(priority) or priority < 0:
+            raise ValueError("candidate_rows priority_weight must be finite and nonnegative")
+        careunit = row.get("first_careunit")
+        if careunit is not None and not isinstance(careunit, str):
+            raise ValueError("candidate_rows first_careunit must be a string or None")
+        stays.append({
+            "stay_id": sid,
+            "sofa_total": sofa,
+            "priority_weight": priority,
+            "first_careunit": careunit,
+        })
+        seen.add(sid)
+    return sorted(stays, key=lambda row: row["stay_id"])
 
 
 def _careunit_zone(careunit: str | None) -> int:
@@ -269,6 +316,11 @@ def run_assignment(
     active_objectives: Sequence[str] | None = None,
     pivot: str | None = None,
     epsilon: Mapping[str, float] | None = None,
+    candidate_rows: Sequence[Mapping[str, object]] | None = None,
+    retain_occupied: bool = False,
+    solver_seed: int | None = None,
+    max_time_seconds: float | None = None,
+    resource_overrides: Mapping[str, object] | None = None,
 ) -> dict:
     """Run CP-SAT bed assignment.
 
@@ -282,8 +334,21 @@ def run_assignment(
             decision step; enables the move penalty (f5).
         active_objectives: weighted-sum objective names (default: all six).
         pivot: optimize this objective alone (anchor solve / epsilon pivot).
-        epsilon: upper bounds for the non-pivot objectives; requires pivot.
+        epsilon: upper bounds for minimized and lower bounds for maximized
+            non-pivot objectives; requires pivot.
+        candidate_rows: fixed time-specific patient snapshot with provided
+            priority and SOFA, requiring persist=False and split=None.
+        retain_occupied: keep every patient in previous_beds assigned to a bed.
+        solver_seed: enable a fixed seed and single-worker solving when set.
+        max_time_seconds: optional per-solve time limit (default 30 seconds).
+        resource_overrides: optional per-solve resource config, including bed
+            zones when changing the layout.
     """
+    if candidate_rows is not None:
+        if persist:
+            raise ValueError("candidate_rows requires persist=False")
+        if split is not None:
+            raise ValueError("candidate_rows fixes the candidate pool; omit split")
     if split is not None and split not in ("calib", "eval"):
         raise ValueError("split must be 'calib', 'eval' or None")
     opt = load_yaml("optimizer.yaml")
@@ -292,7 +357,13 @@ def run_assignment(
     vent_mode = _resolve_vent_mode(opt)
     vent_cfg = opt.get("vent", {}) or {}
     vent_proxy_sofa_min = float(vent_cfg.get("proxy_sofa_min", 5.0))
-    priority_mode = _resolve_priority_mode(opt)
+    priority_mode = (
+        "provided" if candidate_rows is not None else _resolve_priority_mode(opt)
+    )
+    if candidate_rows is not None and (iso_mode == "real" or vent_mode == "real"):
+        raise ValueError(
+            "candidate_rows cannot load real isolation or ventilator flags from the database"
+        )
     if epsilon and pivot is None:
         raise ValueError("epsilon requires an explicit pivot objective")
     if pivot is not None and pivot not in OBJECTIVES:
@@ -302,11 +373,25 @@ def run_assignment(
         if unknown:
             raise ValueError(f"unknown objective(s): {', '.join(sorted(unknown))}")
     prev_bed = {int(k): int(v) for k, v in (previous_beds or {}).items()}
-    n_beds = int(opt.get("resources", {}).get("n_beds", 20))
-    n_iso_beds = int(opt.get("resources", {}).get("n_isolation_beds", 4))
-    n_vents = int(opt.get("resources", {}).get("n_ventilators", 8))
-    max_patients = int(opt.get("resources", {}).get("max_patients", n_beds * 10))
-    bed_zones_cfg = opt.get("resources", {}).get(
+    resources = dict(opt.get("resources", {}))
+    resources.update(resource_overrides or {})
+    n_beds = int(resources.get("n_beds", 20))
+    n_iso_beds = int(resources.get("n_isolation_beds", 4))
+    n_vents = int(resources.get("n_ventilators", 8))
+    max_patients = int(resources.get("max_patients", n_beds * 10))
+    if n_beds < 1 or not 0 <= n_iso_beds <= n_beds or n_vents < 0:
+        raise ValueError("invalid bed, isolation bed or ventilator capacity")
+    if retain_occupied and (
+        len(set(prev_bed.values())) != len(prev_bed)
+        or any(not 1 <= bed <= n_beds for bed in prev_bed.values())
+    ):
+        raise ValueError(
+            "previous_beds must reference unique valid beds when retaining patients"
+        )
+    solver_time = float(30.0 if max_time_seconds is None else max_time_seconds)
+    if not math.isfinite(solver_time) or solver_time <= 0:
+        raise ValueError("max_time_seconds must be a finite positive number")
+    bed_zones_cfg = resources.get(
         "bed_zones",
         [[1, 4, "ISO"], [5, 4, "MICU"], [9, 4, "SICU"], [13, 4, "CCU"], [17, 4, "NICU"]],
     )
@@ -319,124 +404,143 @@ def run_assignment(
             bed_zone_label[b] = label
         bed_zone_start[label] = start
         bed_zone_count[label] = count
+    if resource_overrides and (
+        set(bed_zone_label) != set(range(1, n_beds + 1))
+        or any(count <= 0 for _, count, _ in bed_zones_cfg)
+        or sum(count for _, count, _ in bed_zones_cfg) != n_beds
+        or len(bed_zone_start) != len(bed_zones_cfg)
+        or {bed for bed, zone in bed_zone_label.items() if zone == "ISO"}
+        != set(range(1, n_iso_beds + 1))
+    ):
+        raise ValueError(
+            "bed_zones must cover each bed once and label the first isolation beds ISO"
+        )
     run_id = run_id or f"p0_{uuid.uuid4().hex[:8]}"
 
     # ── 1. Load patients ──────────────────────────────────────────
-    engine = get_engine()
-    priority_cfg = opt.get("priority", {}) or {}
-    cand_cfg = opt.get("candidates", {}) or {}
-    candidate_mode = _resolve_candidate_mode(opt)
-    candidate_seed = int(cand_cfg.get("seed", 42))
-    candidate_size = int(cand_cfg.get("size", max_patients))
-    strata = max(1, int(cand_cfg.get("strata", 4)))
-    wait_source = "los_percentile"
+    engine = None
+    if candidate_rows is not None:
+        stays = _snapshot_stays(candidate_rows)
+        candidate_mode = "provided"
+        candidate_seed = None
+        candidate_size = len(stays)
+        wait_source = "unavailable"
+    else:
+        engine = get_engine()
+        priority_cfg = opt.get("priority", {}) or {}
+        cand_cfg = opt.get("candidates", {}) or {}
+        candidate_mode = _resolve_candidate_mode(opt)
+        candidate_seed = int(cand_cfg.get("seed", 42))
+        candidate_size = int(cand_cfg.get("size", max_patients))
+        strata = max(1, int(cand_cfg.get("strata", 4)))
+        wait_source = "los_percentile"
 
-    base_sql = """
-        SELECT s.stay_id,
-               COALESCE(p.priority_weight, 1.0) AS priority_weight,
-               COALESCE(so.sofa_total, 0) AS sofa_total,
-               s.first_careunit,
-               COALESCE(s.elapsed_hours, 0) AS elapsed_hours,
-               cume_dist() OVER (
-                   ORDER BY COALESCE(s.elapsed_hours, 0)
-               ) AS los_pct
-        FROM staging.icustays_v s
-        LEFT JOIN feat.patient_priority p ON s.stay_id = p.stay_id
-        LEFT JOIN feat.sofa_timeseries so
-               ON s.stay_id = so.stay_id AND so.hour_index = 0
-    """
+        base_sql = """
+            SELECT s.stay_id,
+                   COALESCE(p.priority_weight, 1.0) AS priority_weight,
+                   COALESCE(so.sofa_total, 0) AS sofa_total,
+                   s.first_careunit,
+                   COALESCE(s.elapsed_hours, 0) AS elapsed_hours,
+                   cume_dist() OVER (
+                       ORDER BY COALESCE(s.elapsed_hours, 0)
+                   ) AS los_pct
+            FROM staging.icustays_v s
+            LEFT JOIN feat.patient_priority p ON s.stay_id = p.stay_id
+            LEFT JOIN feat.sofa_timeseries so
+                   ON s.stay_id = so.stay_id AND so.hour_index = 0
+        """
 
-    with engine.connect() as conn:
-        if candidate_mode == "top_score":
-            if priority_mode == "composite":
+        with engine.connect() as conn:
+            if candidate_mode == "top_score":
+                if priority_mode == "composite":
+                    rows = conn.execute(
+                        text(
+                            f"""
+                            SELECT * FROM ({base_sql}) t
+                            ORDER BY :sofa_weight * t.sofa_total / 12.0
+                                   + :wait_weight * t.los_pct DESC,
+                                     t.stay_id
+                            LIMIT :size
+                            """
+                        ),
+                        {
+                            "sofa_weight": float(priority_cfg.get("sofa_weight", 0.6)),
+                            "wait_weight": float(priority_cfg.get("wait_weight", 0.4)),
+                            "size": candidate_size,
+                        },
+                    ).mappings().all()
+                else:
+                    rows = conn.execute(
+                        text(
+                            f"""
+                            SELECT * FROM ({base_sql}) t
+                            ORDER BY t.priority_weight DESC, t.sofa_total DESC, t.stay_id
+                            LIMIT :size
+                            """
+                        ),
+                        {"size": candidate_size},
+                    ).mappings().all()
+            elif candidate_mode == "fixed_sample":
                 rows = conn.execute(
                     text(
                         f"""
                         SELECT * FROM ({base_sql}) t
-                        ORDER BY :sofa_weight * t.sofa_total / 12.0
-                               + :wait_weight * t.los_pct DESC,
-                                 t.stay_id
+                        ORDER BY md5(t.stay_id::text || :seed)
                         LIMIT :size
+                        """
+                    ),
+                    {"seed": str(candidate_seed), "size": candidate_size},
+                ).mappings().all()
+            else:  # stratified
+                per_band = max(1, candidate_size // strata)
+                rows = conn.execute(
+                    text(
+                        f"""
+                        WITH base AS ({base_sql}),
+                        banded AS (
+                            SELECT *, ntile(:strata) OVER (ORDER BY sofa_total) AS band
+                            FROM base
+                        ),
+                        ranked AS (
+                            SELECT *, row_number() OVER (
+                                PARTITION BY band ORDER BY md5(stay_id::text || :seed)
+                            ) AS rn
+                            FROM banded
+                        )
+                        SELECT stay_id, priority_weight, sofa_total, first_careunit,
+                               elapsed_hours, los_pct
+                        FROM ranked
+                        WHERE rn <= :per_band
+                        ORDER BY band, rn
                         """
                     ),
                     {
-                        "sofa_weight": float(priority_cfg.get("sofa_weight", 0.6)),
-                        "wait_weight": float(priority_cfg.get("wait_weight", 0.4)),
-                        "size": candidate_size,
+                        "seed": str(candidate_seed),
+                        "strata": strata,
+                        "per_band": per_band,
                     },
                 ).mappings().all()
-            else:
-                rows = conn.execute(
-                    text(
-                        f"""
-                        SELECT * FROM ({base_sql}) t
-                        ORDER BY t.priority_weight DESC, t.sofa_total DESC, t.stay_id
-                        LIMIT :size
-                        """
-                    ),
-                    {"size": candidate_size},
-                ).mappings().all()
-        elif candidate_mode == "fixed_sample":
-            rows = conn.execute(
-                text(
-                    f"""
-                    SELECT * FROM ({base_sql}) t
-                    ORDER BY md5(t.stay_id::text || :seed)
-                    LIMIT :size
-                    """
-                ),
-                {"seed": str(candidate_seed), "size": candidate_size},
-            ).mappings().all()
-        else:  # stratified
-            per_band = max(1, candidate_size // strata)
-            rows = conn.execute(
-                text(
-                    f"""
-                    WITH base AS ({base_sql}),
-                    banded AS (
-                        SELECT *, ntile(:strata) OVER (ORDER BY sofa_total) AS band
-                        FROM base
-                    ),
-                    ranked AS (
-                        SELECT *, row_number() OVER (
-                            PARTITION BY band ORDER BY md5(stay_id::text || :seed)
-                        ) AS rn
-                        FROM banded
-                    )
-                    SELECT stay_id, priority_weight, sofa_total, first_careunit,
-                           elapsed_hours, los_pct
-                    FROM ranked
-                    WHERE rn <= :per_band
-                    ORDER BY band, rn
-                    """
-                ),
-                {
-                    "seed": str(candidate_seed),
-                    "strata": strata,
-                    "per_band": per_band,
-                },
-            ).mappings().all()
 
-    stays = [dict(r) for r in rows]
-    if len(stays) > candidate_size:
-        stays = stays[:candidate_size]
+        stays = [dict(r) for r in rows]
+        if len(stays) > candidate_size:
+            stays = stays[:candidate_size]
 
-    # Elapsed ICU time as the waiting proxy, normalized by its empirical
-    # percentile.  MIMIC dates are shifted per subject, so calendar-time waiting
-    # cannot be reconstructed across patients.
-    for s in stays:
-        s["wait_norm"] = min(max(float(s.get("los_pct") or 0.0), 0.0), 1.0)
-        s["wait_hours"] = max(float(s.get("elapsed_hours") or 0.0), 0.0)
+        # Elapsed ICU time as the waiting proxy, normalized by its empirical
+        # percentile.  MIMIC dates are shifted per subject, so calendar-time waiting
+        # cannot be reconstructed across patients.
+        for s in stays:
+            s["wait_norm"] = min(max(float(s.get("los_pct") or 0.0), 0.0), 1.0)
+            s["wait_hours"] = max(float(s.get("elapsed_hours") or 0.0), 0.0)
 
-    if priority_mode == "composite":
-        effective = build_priority(
-            "composite",
-            [float(s["sofa_total"]) for s in stays],
-            [float(s["wait_norm"]) for s in stays],
-            priority_cfg,
-        )
-        for s, w in zip(stays, effective):
-            s["priority_weight"] = w
+        if priority_mode == "composite":
+            effective = build_priority(
+                "composite",
+                [float(s["sofa_total"]) for s in stays],
+                [float(s["wait_norm"]) for s in stays],
+                priority_cfg,
+            )
+            for s, w in zip(stays, effective):
+                s["priority_weight"] = w
 
     # Restrict candidates to calib / eval subset (tuning only touches calib).
     split_meta = None
@@ -454,6 +558,8 @@ def run_assignment(
         }
 
     n = len(stays)
+    if retain_occupied and prev_bed.keys() - {s["stay_id"] for s in stays}:
+        raise ValueError("retained patients in previous_beds must be candidates")
     if n == 0:
         return {
             "run_id": run_id,
@@ -564,7 +670,11 @@ def run_assignment(
     for b in range(n_beds):
         model.Add(sum(x[i, b] for i in range(n)) <= 1)
     for i in range(n):
-        model.Add(sum(x[i, b] for b in range(n_beds)) <= 1)
+        bed_count = sum(x[i, b] for b in range(n_beds))
+        if retain_occupied and stay_ids[i] in prev_bed:
+            model.Add(bed_count == 1)
+        else:
+            model.Add(bed_count <= 1)
 
     # Isolation: isolation patients can only use isolation beds (first n_iso_beds)
     #            non-isolation patients cannot use isolation beds.
@@ -606,10 +716,13 @@ def run_assignment(
 
     # ── 4. Solve ──────────────────────────────────────────────────
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 30.0
+    solver.parameters.max_time_in_seconds = solver_time
+    if solver_seed is not None:
+        solver.parameters.random_seed = solver_seed
+        solver.parameters.num_search_workers = 1
     status = solver.Solve(model)
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-        raise RuntimeError(f"CP-SAT failed: status={status}")
+        raise AssignmentSolveError(solver.StatusName(status))
 
     # ── 5. Collect results ────────────────────────────────────────
     assignments = []
@@ -636,6 +749,7 @@ def run_assignment(
 
     # Tuning runs should not fill the production assignment table.
     if persist:
+        assert engine is not None
         with engine.begin() as conn:
             conn.execute(
                 text("DELETE FROM sched.assignments WHERE run_id = :run_id"),
@@ -727,8 +841,8 @@ def run_assignment(
                 n_zone_match / assigned_count, 4
             ) if assigned_count else 0.0,
             "solve_time_seconds": round(solver.WallTime(), 4),
-            "avg_wait_hours": round(sum(wait_values) / n, 2) if n else 0.0,
-            "max_wait_hours": round(max(wait_values), 2) if wait_values else 0.0,
+            "avg_wait_hours": round(sum(wait_values) / n, 2) if candidate_rows is None else None,
+            "max_wait_hours": round(max(wait_values), 2) if candidate_rows is None else None,
             # ── business metrics (lambda-independent, clinical meaning) ──
             "unassigned": n - assigned_count,
             "moved_patients": f5_val,

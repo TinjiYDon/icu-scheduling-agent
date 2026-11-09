@@ -1,7 +1,12 @@
 # 多目标优化实施任务清单
 
-> 目标：把当前"线性加权单目标 CP-SAT"升级为"ε-约束 + Pareto 前沿"。
+> 目标：把当前"线性加权单目标 CP-SAT"升级为"ε-约束 + Pareto 前沿"，并完成前沿质量检验。
 > 理论依据见 [`MULTIOBJECTIVE_THEORY.md`](MULTIOBJECTIVE_THEORY.md)。
+>
+> 路线：P0–P3（已完成）→ P4 ε 扫描 → P5 持久化 → **P6 滚动层接入（已完成）** → **P7 前沿质量检验（进行中）**
+> P7 对齐 `origin/main` 的 **S4 前沿质量协议 / I1**（自适应 ε + NSGA-II 对照 + HV/IGD/膝点/规模 + 6 场景 × 5 seed）。
+>
+> 数据问题：D1（隔离）、D2（优先级共线）、D3（六分量 SOFA）、D4（呼吸机 / 候选池 / los 单位）**均已完成**。
 
 ---
 
@@ -19,9 +24,9 @@
 
 ---
 
-## 0.1 数据问题（阻塞，待修复）
+## 0.1 数据问题
 
-数据探查结果详见 [`data_example.md`](data_example.md)。D1、D2、D4 已完成；D3 依赖 Layer0 数据恢复。
+数据探查结果详见 [`data_example.md`](data_example.md)。**D1、D2、D3、D4 均已完成**。
 
 ### D1 隔离标记失真（已完成）
 
@@ -54,12 +59,12 @@
 - 涉及文件：`domain/scoring/priority.py`、`domain/optimizer/cp_sat.py`、`configs/optimizer.yaml`、`tests/test_priority.py`。
 - 状态：已完成（2026-10-27）。
 
-### D3 SOFA 区分度低且无时间序列
+### D3 SOFA 区分度低且无时间序列（小样本入口已实现）
 
-- 现状：0–12 分（仅肾/肝/凝血），71.7% 集中在 4–5 分；`sofa_timeseries` 只有 `hour_index = 0`。
+- 旧数据：0–12 分（仅肾/肝/凝血），71.7% 集中在 4–5 分；`sofa_timeseries` 只有 `hour_index = 0`。
 - 影响：$f_2$ 分辨率不足；无法建模等待期间的病情演变。
 - 修复方向：补齐呼吸/循环/神经分量；或按时间窗生成多小时 SOFA；或改用 SOFA 分段/阈值约束。
-- 状态：待修复。
+- 交付：`application.prepare_sofa_sample` 从 MIMIC-IV 3.1 固定抽样，按 2h 端点生成 24h 回顾窗的六分量 SOFA。留存证据时间、缺失标记与分量值。评分规则、数据覆盖条件与官方 SQL 的差异见 [SOFA_SCORING.md](SOFA_SCORING.md)。原数据库入口仍沿用历史评分口径。
 
 ### D4.1 呼吸机标记（已完成）
 
@@ -361,21 +366,48 @@ CREATE TABLE IF NOT EXISTS sched.pareto_solutions (
 
 ---
 
-## P6 滚动层接入（预计 1–2 天）
+## P6 滚动层接入（已完成 2026-11-07）
 
 **目标**：让 $f_5$（挪床）从「恒为 0」变为真实有效维度，并把静态前沿接到滚动重解上。
 
-- [ ] `domain/rolling/engine.py` 每步调用 `run_assignment(previous_beds=<上一步分配>)`
-- [ ] 确认 $f_5$ 不再恒为 0（滚动第 2 步起有效）
-- [ ] 记录每步的 $f_5$ 与方案相似度（换床人数 / 两期共同患者数）
-- [ ] 每步重跑 P3 锚点（实例已变，标尺必须更新）
-- [ ] 输出滚动轨迹中的「稳定性—收益」曲线（逐步 $f_1$ vs $f_5$）
+> 交付：`domain/rolling/timed_pareto.py`（小样本回放入口）+ `application/run_timed_pareto.py`。
+> 数学口径见 `MULTIOBJECTIVE_THEORY.md` 第 8 节「带时间标签的滚动 Pareto」。
+> 旧 `domain/rolling/engine.py` 保留兼容，其随机出入院逻辑未改动。
+
+- [x] `timed_pareto.py` 每步读取当时可用的 SOFA，把决策前床位传给求解器
+- [x] 保存每步的 $f_5$、方案相似度、六目标值与备选分配
+- [x] 保存稳定性与收益原始值，交给后续分析绘图
+- [x] 每步重跑锚点：先跑加权和 reference，再用单目标求解构造 payoff 表，并设占用下限 $f_0\ge\lfloor\rho f_0^{I}\rfloor$（$\rho=0.9$）
+- [x] 第 0 步另记初始状态，24h 回放共 **13 个决策快照**
 
 **验收**
 
-- 跑完整 24h 仿真，$f_5$ 在第 2 步及之后取到非零值
-- 方案相似度指标可复现（同 seed 两次运行结果一致）
-- 能画出「换床数 ↑ 时 $f_1$ ↑」的权衡曲线，说明 $f_5$ 已进入前沿
+- 24h 回放含 13 个决策快照；按床位映射独立重算 $f_5$ 与相似度，并检查患者状态守恒
+- 构造例验证非零挪床成立；**真实执行方案可为零**（不为满足"不再恒 0"而制造换床）
+- 使用同一评分输入和种子复跑，核对决策与备选解一致
+
+```powershell
+.\.venv\Scripts\python.exe -m application.prepare_sofa_sample --zip ..\mimic-iv-3.1.zip --size 50 --seed 42
+.\.venv\Scripts\python.exe -m application.run_timed_pareto --input artifacts/sofa_sample/sofa_sample.json --steps 12 --seed 42 --levels 2 --max-time 3
+```
+
+首次准备数据时逐块筛选压缩包；评分缓存可用 `application.prepare_sofa_sample --score-only` 重算。评分与轨迹分别写入 `artifacts/sofa_sample/` 和 `reports/rolling/`，两者均受 Git 忽略。
+
+**验收记录（2026-11-07）**
+
+复用 MIMIC-IV 3.1 的 50 例缓存，重新生成 1,250 条评分，与功能分支评分逐字节一致。第 24 小时有 12 例六分量均可评分，其他缺项保留标记。20 床、种子 42、稀疏网格（`levels=2`）跑两遍 24h，13 个时点的执行分配、六目标及前沿备选一致。执行方案均为 OPTIMAL 且未发生挪床，前沿备选中存在 $f_5>0$ 的可行方案。首轮验收 100 次 ε 求解中 87 次 OPTIMAL、2 次 FEASIBLE、11 次 INFEASIBLE。逐步核对评分可见时间、患者守恒、床位映射、挪床计数、ε 边界与非支配关系，全部通过。
+
+补验使用本机 PostgreSQL 16 的 `127.0.0.1:5432`（在 `configs/database.yaml` 配置实际连接）。`test_db.py` 检查数据库连接与 `mock.icustays` 样例，`test_get_plan_not_found` 检查 `sched.assignments` 中不存在的方案；三项均通过，完整测试共 **105 项通过**。Docker 的 `5434` 是另一种部署方式，见 `README.md#快速开始`。复跑完整测试前可先创建 `artifacts/`。
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests -q --basetemp artifacts/pytest_archive
+```
+
+**遗留问题（转交 P7）**
+
+- `levels=2` 是接线验证用的稀疏网格，**不保证覆盖完整 Pareto 集**；每轮采样非支配点仅 1–4 个
+- 该入口的优先级沿用 `sofa_rule`（$1+s/10$）作为明确基线，**未解决 D2 共线性**；不使用 `composite` 模式
+- 默认 `retain_occupied=True`（住院患者必须保留床位），避免通过把住院者踢出队列规避换床代价
 
 ---
 
@@ -386,26 +418,27 @@ CREATE TABLE IF NOT EXISTS sched.pareto_solutions (
 > main 文档对当前状态的描述：「当前“前沿”= 81 点 ε 网格里的 4 个点；单实例、参考点自定、无统计检验；有效维度只有 2–3」。
 > 本阶段要回答三个不同层次的问题：**结果好不好**、**方法值不值得**、**结论可不可信**。
 
-### 7.1 前沿规模（回答“结果好不好”）
+### 7.1 前沿规模（回答"结果好不好"）
 
 - [ ] 扫描输出 `n_grid / n_feasible / n_nondominated`
 - [ ] 非支配率 $|F| / |F_{\text{feasible}}|$
 - [ ] spacing（Schott）：$\sqrt{\frac{1}{|F|-1}\sum_{i}(\bar d - d_i)^2}$，衡量间距均匀性
 - [ ] 跨 seed 汇总（均值 ± 95% CI）
+
 **为什么**：4 个点连曲线都画不出；且 VoF 公式里的 $\min_{x\in F}$ 会因前沿稀疏而被系统性低估。
 
-### 7.2 IGD（回答“前沿有没有漏区”）
+### 7.2 IGD（回答"前沿有没有漏区"）
 
-$$\text{IGD}(F, P^*) = \frac{1}{|P^*|}\sum_{p^*\in P^*}\min_{f\in F} d(p^*, f)$$
+$$\text{IGD}(F, P^*) = \frac{1}{|P^*|}\sum_{p^*\in P^*} \min_{f\in F} d(p^*, f)$$
 
 - [ ] `igd(front, ref_front, ideal, nadir) -> float`（越小越好）
 - [ ] 参考前沿 $P^*$ = **全方法并集**再做一次非支配过滤（CP-SAT 稠密扫描 ∪ NSGA-II 存档 ∪ WS ∪ Lex）
 - [ ] **禁止**用单一方法自己的前沿当 $P^*$（循环论证）
 - [ ] 与 HV 使用同一套 ideal/nadir，避免口径不一致
 
-**为什么**：HV 只看“包住多少体积”，不惩罚中间空洞；IGD 从参考前沿逐点回看，能抓住“前沿某一段完全缺失”。
+**为什么**：HV 只看"包住多少体积"，不惩罚中间空洞；IGD 从参考前沿逐点回看，能抓住"前沿某一段完全缺失"。
 
-### 7.3 NSGA-II 对照（回答“方法值不值得”）
+### 7.3 NSGA-II 对照（回答"方法值不值得"）
 
 - [ ] 编码：解 = 患者的一个排列 $\pi$；解码 = 按 $\pi$ 顺序贪婪放床，**构造上保证满足硬约束**
 - [ ] 交叉：PMX（部分匹配交叉）；变异：两点交换
@@ -413,11 +446,11 @@ $$\text{IGD}(F, P^*) = \frac{1}{|P^*|}\sum_{p^*\in P^*}\min_{f\in F} d(p^*, f)$$
 - [ ] **同池、同 split、同时限**（与 CP-SAT 完全同一实例）
 - [ ] 对比维度：HV / IGD / 前沿规模 / 可行性违反数 / 耗时 / 是否可证明最优
 
-**为什么**：多目标优化的标准答案是 NSGA-II，且领域内最接近的工作（SciRep 2023 ICU 两阶段分床）用的就是 NSGA-II。不做对照就无法回答“为何不用标准方法”。
+**为什么**：多目标优化的标准答案是 NSGA-II，且领域内最接近的工作（SciRep 2023 ICU 两阶段分床）用的就是 NSGA-II。不做对照就无法回答"为何不用标准方法"。
 
 **预期结论**：CP-SAT 每点可证明最优但前沿密度受网格限制；NSGA-II 密度高但无最优性保证。这是一个**真实的成本–质量权衡**，本身就是可写的结论。
 
-### 7.4 多场景 × 多 seed（回答“结论可不可信”）
+### 7.4 多场景 × 多 seed（回答"结论可不可信"）
 
 **场景（6 个，可直接复用 main 的 `moo_scenarios.SCENARIOS`）**
 
@@ -462,13 +495,17 @@ $env:PYTHONPATH = (Get-Location)
 # 测试
 .\.venv\Scripts\python.exe -m pytest tests -q
 
-# 单次加权和求解（现状）
+# 单次加权和求解
 .\.venv\Scripts\python.exe -m application.simulate
 
-# 后续：Pareto 扫描（P4 完成后）
-.\.venv\Scripts\python.exe -m application.pareto --pivot wait --q 5
+# 锚点求解（P3）
+.\.venv\Scripts\python.exe -m application.pareto
 
-# 后续：前沿质量检验（P7 完成后）
+# 六分量 SOFA 小样本 + 滚动 Pareto 回放（P6，已完成）
+.\.venv\Scripts\python.exe -m application.prepare_sofa_sample --zip ..\mimic-iv-3.1.zip --size 50 --seed 42
+.\.venv\Scripts\python.exe -m application.run_timed_pareto --input artifacts/sofa_sample/sofa_sample.json --steps 12 --seed 42 --levels 2 --max-time 3
+
+# 后续：前沿质量检验（P7）
 .\.venv\Scripts\python.exe -m application.front_quality --scenarios all --seeds 5
 ```
 
@@ -480,5 +517,6 @@ $env:PYTHONPATH = (Get-Location)
 | P2 | `domain/optimizer/objectives.py` | `domain/optimizer/cp_sat.py` |
 | P3–P4 | `domain/optimizer/pareto.py` | — |
 | P5 | `data_access/pareto_repo.py`、`migrations/005_pareto_solutions.sql` | — |
-| P6 | — | `domain/rolling/engine.py` |
-| P7 | `domain/optimizer/front_quality.py`、`domain/optimizer/nsga2.py`、`application/front_quality.py` | — |
+| **D3** | `domain/scoring/sofa_full.py`、`data_access/mimic_sample.py`、`application/prepare_sofa_sample.py` | — |
+| **P6** | `domain/rolling/timed_pareto.py`、`application/run_timed_pareto.py` | `domain/optimizer/cp_sat.py`、`domain/optimizer/pareto.py` |
+| **P7** | `domain/optimizer/front_quality.py`、`domain/optimizer/nsga2.py`、`application/front_quality.py` | — |
