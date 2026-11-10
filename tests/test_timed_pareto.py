@@ -7,6 +7,7 @@ import pytest
 from domain.optimizer.pareto import OBJECTIVE_KEYS
 from domain.rolling.timed_pareto import (
     _epsilon_grid,
+    _front,
     asof_score,
     quality_objective_names,
     run_timed_pareto,
@@ -95,7 +96,12 @@ def test_relative_replay_uses_asof_scores_and_counts_forced_bed_change():
         calls = [c for c in solver.calls if c["previous_beds"] == previous_beds]
         assert calls
         assert all(not c["persist"] and c["solver_seed"] == 0 for c in calls)
-    assert second["front"][0]["extras"]["assignments"] == second["assignments"]
+    assert second["reference_on_sampled_front"] is True
+    assert any(
+        point["source"] == "reference"
+        and point["extras"]["assignments"] == second["assignments"]
+        for point in second["front"]
+    )
 
 
 def test_future_scores_cannot_change_earlier_decisions():
@@ -226,10 +232,12 @@ def test_infeasible_grid_is_recorded_as_solver_status():
         return solver(**kwargs)
 
     report = run_timed_pareto(payload(), solve=infeasible_scan, n_beds=2, n_steps=0)
-    assert report["history"][0]["front"] == []
-    assert {p["status"] for p in report["history"][0]["epsilon_scan"]["points"]} == {
-        "INFEASIBLE"
-    }
+    scan = report["history"][0]["epsilon_scan"]
+    assert {p["status"] for p in scan["points"]} == {"INFEASIBLE"}
+    # Reference and anchors remain feasible candidates; only grid points failed.
+    assert scan["n_feasible"] == 0
+    assert scan["n_feasible_candidates"] > 0
+    assert any(p["source"] == "reference" for p in report["history"][0]["front"])
 
 
 def test_disabled_demand_constraints_preserve_default_resources():
@@ -407,6 +415,86 @@ def test_replay_rejects_level_map_without_active_axis():
         )
 
 
+def test_move_axis_levels_adds_move_to_the_explicit_grid():
+    report = run_timed_pareto(
+        payload(),
+        solve=Solver(),
+        n_beds=2,
+        n_steps=1,
+        admission_rate=0,
+        discharge_rate=0,
+        level_map={"overload": 3, "zone_mismatch": 2},
+        move_axis_levels=2,
+    )
+    scan = report["history"][0]["epsilon_scan"]
+    assert scan["move_axis_levels"] == 2
+    assert scan["level_map"] == {
+        "overload": 3,
+        "zone_mismatch": 2,
+        "move": 2,
+    }
+    assert scan["grid"]
+    assert all("move" in row for row in scan["grid"])
+    # The practical range can collapse to one integer level for this toy state;
+    # the point of the test is that move is an explicit bound, not a churned
+    # column.  A larger level count is covered by the epsilon-grid unit tests.
+    assert {row["move"] for row in scan["grid"]} <= {0, 1, 2}
+    assert scan["quality_objectives"] == [
+        "wait",
+        "overload",
+        "zone_mismatch",
+        "move",
+    ]
+
+
+def test_move_axis_levels_requires_a_level_map():
+    with pytest.raises(ValueError, match="requires level_map"):
+        run_timed_pareto(
+            payload(),
+            solve=Solver(),
+            n_beds=2,
+            n_steps=0,
+            move_axis_levels=2,
+        )
+
+
+def test_move_axis_levels_is_mutually_exclusive_with_move_levels():
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        run_timed_pareto(
+            payload(),
+            solve=Solver(),
+            n_beds=2,
+            n_steps=0,
+            level_map={"overload": 2},
+            move_axis_levels=2,
+            move_levels=2,
+        )
+
+
+def test_reference_and_payoff_anchors_are_front_candidates():
+    """The reference and the 6+5 anchors must reach the dominance filter.
+
+    ``n_candidates`` counts the reference, the six pure anchors, the five
+    practical anchors and every grid point.  Excluding these extras is how a
+    reported "front" can contain points the executed reference already beats.
+    """
+    report = run_timed_pareto(
+        payload(),
+        solve=Solver(),
+        n_beds=2,
+        n_steps=1,
+        admission_rate=0,
+        discharge_rate=0,
+        level_map={"overload": 2, "zone_mismatch": 2},
+    )
+    scan = report["history"][0]["epsilon_scan"]
+    assert scan["n_candidates"] == scan["n_grid"] + 1 + 6 + 5
+    assert scan["n_feasible_candidates"] >= scan["n_feasible"]
+    assert any(
+        point["source"] == "reference" for point in report["history"][0]["front"]
+    )
+
+
 def test_max_moves_reaches_every_sub_solve():
     """A move budget must constrain the anchors and the scan, not just one call.
 
@@ -455,43 +543,56 @@ def test_replay_rejects_negative_max_moves():
         )
 
 
-def test_move_joins_quality_objectives_only_when_the_front_trades_it():
-    """f5 is scored when it varies, and left out when it is constant.
+def test_move_is_not_promoted_to_quality_when_only_churned():
+    """A free move column must not silently become a hypervolume dimension.
 
-    A constant column would multiply every hypervolume by a fixed factor without
-    carrying information, which would make two scans incomparable for no reason.
+    The old rule added move whenever the front happened to vary on it.  Because
+    an unconstrained pivot solve can shuffle beds arbitrarily, that rewarded
+    tie-breaking and made 3-D and 4-D hypervolumes get averaged together.
     """
     grid = [{"occupancy": 18, "overload": 130, "zone_mismatch": 2}]
-
-    constant = [
-        {"wait": 30000, "overload": 130, "zone_mismatch": 1, "move": 0},
-        {"wait": 31000, "overload": 131, "zone_mismatch": 0, "move": 0},
-    ]
-    assert quality_objective_names(grid, constant) == [
+    assert quality_objective_names(grid) == [
         "wait",
         "overload",
         "zone_mismatch",
     ]
 
-    traded = [
-        {"wait": 30000, "overload": 130, "zone_mismatch": 2, "move": 0},
-        {"wait": 30000, "overload": 130, "zone_mismatch": 0, "move": 3},
-    ]
-    assert quality_objective_names(grid, traded) == [
-        "wait",
-        "overload",
-        "zone_mismatch",
-        "move",
-    ]
 
-
-def test_quality_objectives_include_every_active_axis_even_if_constant():
-    # An axis the sweep pins is still part of the design, so it is always scored.
+def test_quality_objectives_include_move_only_when_it_is_an_explicit_axis():
     grid = [{"occupancy": 18, "overload": 130, "zone_mismatch": 2, "move": 2}]
-    values = [{"wait": 30000, "overload": 130, "zone_mismatch": 2, "move": 2}]
-    assert quality_objective_names(grid, values) == [
+    assert quality_objective_names(grid) == [
         "wait",
         "overload",
         "zone_mismatch",
         "move",
     ]
+
+
+def test_front_drops_a_grid_point_dominated_by_the_reference():
+    reference = {
+        "source": "reference",
+        "status": "OPTIMAL",
+        "values": {
+            "occupancy": 20,
+            "wait": 30000,
+            "overload": 100,
+            "balance": 0,
+            "zone_mismatch": 4,
+            "move": 0,
+        },
+        "extras": {},
+    }
+    grid = {
+        "source": "epsilon:1",
+        "status": "OPTIMAL",
+        "values": {
+            "occupancy": 20,
+            "wait": 30000,
+            "overload": 100,
+            "balance": 0,
+            "zone_mismatch": 4,
+            "move": 5,
+        },
+        "extras": {},
+    }
+    assert _front([reference, grid]) == [reference]

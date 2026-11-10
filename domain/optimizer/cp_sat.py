@@ -341,6 +341,7 @@ def run_assignment(
     max_moves_ratio: float | None = None,
     transferable: Sequence[int] | None = None,
     max_transfers: int | None = None,
+    ward_occupancy: int = 0,
 ) -> dict:
     """Run CP-SAT bed assignment.
 
@@ -414,8 +415,37 @@ def run_assignment(
     n_iso_beds = int(resources.get("n_isolation_beds", 4))
     n_vents = int(resources.get("n_ventilators", 8))
     max_patients = int(resources.get("max_patients", n_beds * 10))
+    ward_cfg = opt.get("ward", {}) or {}
+    n_ward_beds = int(resources.get("n_ward_beds", ward_cfg.get("n_beds", 0)))
+    severe_threshold = float(
+        resources.get("severe_threshold", ward_cfg.get("severity_threshold", 8.0))
+    )
+    max_severe_raw = resources.get(
+        "max_severe_ward", ward_cfg.get("max_severe_ward", 2)
+    )
+    max_severe_ward = None if max_severe_raw is None else int(max_severe_raw)
+    ward_eligible_sofa_max = float(
+        resources.get(
+            "ward_eligible_sofa_max", ward_cfg.get("eligible_sofa_max", 24.0)
+        )
+    )
+    ward_active = n_ward_beds > 0
     if n_beds < 1 or not 0 <= n_iso_beds <= n_beds or n_vents < 0:
         raise ValueError("invalid bed, isolation bed or ventilator capacity")
+    if n_ward_beds < 0:
+        raise ValueError("n_ward_beds must be nonnegative")
+    if not math.isfinite(severe_threshold) or not math.isfinite(
+        ward_eligible_sofa_max
+    ):
+        raise ValueError("ward SOFA thresholds must be finite")
+    if max_severe_ward is not None and max_severe_ward < 0:
+        raise ValueError("max_severe_ward must be nonnegative or None")
+    if ward_active and max_severe_ward is not None and max_severe_ward > n_ward_beds:
+        raise ValueError("max_severe_ward cannot exceed n_ward_beds")
+    if ward_occupancy < 0 or (ward_active and ward_occupancy > n_ward_beds):
+        raise ValueError("ward_occupancy must be within ward capacity")
+    if not ward_active and ward_occupancy:
+        raise ValueError("ward_occupancy requires n_ward_beds > 0")
     if retain_occupied and (
         len(set(prev_bed.values())) != len(prev_bed)
         or any(not 1 <= bed <= n_beds for bed in prev_bed.values())
@@ -627,11 +657,25 @@ def run_assignment(
             "split": split,
             "split_meta": split_meta,
             "status": "empty",
+            "ward_active": ward_active,
+            "n_ward_beds": n_ward_beds,
+            "severe_threshold": severe_threshold,
+            "max_severe_ward": max_severe_ward,
+            "ward_eligible_sofa_max": ward_eligible_sofa_max,
+            "ward_patients": [],
+            "n_ward_assigned": 0,
+            "n_severe_ward": 0,
+            "ward_existing": int(ward_occupancy),
+            "ward_census": int(ward_occupancy),
             "evaluation": {
                 "assignment_rate": 0.0,
+                "icu_assignment_rate": 0.0,
                 "priority_total": 0.0,
+                "served_priority_total": 0.0,
                 "avg_assigned_priority": 0.0,
+                "avg_served_priority": 0.0,
                 "high_risk_assigned_rate": 1.0,
+                "high_risk_served_rate": 1.0,
                 "overload_penalty": 0,
                 "balance_deviation": 0,
                 "zone_match_rate": 0.0,
@@ -639,6 +683,14 @@ def run_assignment(
                 "unassigned": 0,
                 "high_risk_waiting": 0,
                 "avg_assigned_sofa": 0.0,
+                "avg_ward_sofa": 0.0,
+                "ward_occupancy": 0,
+                "ward_existing": int(ward_occupancy),
+                "ward_census": int(ward_occupancy),
+                "severe_ward_count": 0,
+                "ward_eligible": 0,
+                "ward_priority_total": 0.0,
+                "served_sofa_total": 0.0,
                 "isolation_utilization": 0.0,
                 "ventilator_utilization": 0.0,
             },
@@ -649,6 +701,8 @@ def run_assignment(
     wait_values = [float(s.get("wait_hours", 0.0)) for s in stays]
     stay_ids = [int(s["stay_id"]) for s in stays]
     sofa_totals = [float(s["sofa_total"]) for s in stays]
+    severe_flags = [s >= severe_threshold for s in sofa_totals]
+    ward_eligible = [s <= ward_eligible_sofa_max for s in sofa_totals]
 
     iso_real_flags = None
     if iso_mode == "real":
@@ -702,6 +756,9 @@ def run_assignment(
         zone_specs=zone_specs,
         prev_bed=prev_bed,
         stay_ids=stay_ids,
+        n_ward_beds=n_ward_beds,
+        ward_active=ward_active,
+        severe_flags=severe_flags,
     )
 
     # ── 2. Build CP-SAT model ─────────────────────────────────────
@@ -718,20 +775,42 @@ def run_assignment(
         if stay_ids[i] in transfer_ids:
             x_out[i] = model.NewBoolVar(f"x_out_{stay_ids[i]}")
 
-    # Hard constraints: each bed ≤1 patient, each patient ≤1 bed
+    # General-ward disposition.  This is a capacity pool, not a set of ward bed
+    # IDs: f2 only needs to know whether a severe patient left the ICU for a
+    # general ward, and the pool keeps f0/f3/f4/f5 definitions unchanged.
+    ward_vars: dict[int, cp_model.IntVar] = {}
+    if ward_active:
+        for i in range(n):
+            ward_vars[i] = model.NewBoolVar(f"ward_{stay_ids[i]}")
+            if not ward_eligible[i]:
+                model.Add(ward_vars[i] == 0)
+        model.Add(
+            sum(ward_vars.values()) + int(ward_occupancy) <= n_ward_beds
+        )
+        if max_severe_ward is not None:
+            model.Add(
+                sum(ward_vars[i] for i in range(n) if severe_flags[i])
+                <= int(max_severe_ward)
+            )
+    ctx.ward_vars = ward_vars
+
+    # Hard constraints: each bed ≤1 patient, each patient ≤1 bed/ward/out.
     for b in range(n_beds):
         model.Add(sum(x[i, b] for i in range(n)) <= 1)
     for i in range(n):
         bed_count = sum(x[i, b] for b in range(n_beds))
         out_var = x_out.get(i)
+        ward_var = ward_vars.get(i)
+        ward_term = ward_var if ward_var is not None else 0
         if retain_occupied and stay_ids[i] in prev_bed:
             if out_var is not None:
-                # Retained incumbents keep a bed unless they are stepped down.
-                model.Add(bed_count + out_var == 1)
+                # Retained incumbents keep an ICU bed, move to the ward, or are
+                # stepped down; exactly one disposition is chosen.
+                model.Add(bed_count + ward_term + out_var == 1)
             else:
-                model.Add(bed_count == 1)
+                model.Add(bed_count + ward_term == 1)
         else:
-            model.Add(bed_count <= 1)
+            model.Add(bed_count + ward_term <= 1)
             if out_var is not None:
                 model.Add(out_var == 0)
     if x_out and max_transfers is not None:
@@ -820,6 +899,13 @@ def run_assignment(
     transferred = sorted(
         stays[i]["stay_id"] for i, var in x_out.items() if solver.Value(var) == 1
     )
+    ward_patients = sorted(
+        stays[i]["stay_id"] for i, var in ward_vars.items() if solver.Value(var) == 1
+    )
+    severe_by_id = {
+        int(stay_ids[i]): bool(severe_flags[i]) for i in range(n)
+    }
+    n_severe_ward = sum(1 for sid in ward_patients if severe_by_id[sid])
 
     # Tuning runs should not fill the production assignment table.
     if persist:
@@ -862,6 +948,17 @@ def run_assignment(
     assigned_priority_total = sum(float(a["priority_weight"]) for a in assignments)
     assigned_sofa_total = sum(float(a["sofa_total"]) for a in assignments)
     assigned_count = len(assignments)
+    by_stay = {int(stay_ids[i]): stays[i] for i in range(n)}
+    ward_priority_total = sum(
+        float(by_stay[sid]["priority_weight"]) for sid in ward_patients
+    )
+    ward_sofa_total = sum(float(by_stay[sid]["sofa_total"]) for sid in ward_patients)
+    served_count = assigned_count + len(ward_patients)
+    served_priority_total = assigned_priority_total + ward_priority_total
+    served_sofa_total = assigned_sofa_total + ward_sofa_total
+    high_risk_served = high_risk_assigned + sum(
+        1 for sid in ward_patients if float(by_stay[sid]["sofa_total"]) >= 10
+    )
 
     return {
         "run_id": run_id,
@@ -891,6 +988,16 @@ def run_assignment(
         "max_transfers": None if max_transfers is None else int(max_transfers),
         "transferred": transferred,
         "n_transferred": len(transferred),
+        "ward_active": ward_active,
+        "n_ward_beds": n_ward_beds,
+        "severe_threshold": severe_threshold,
+        "max_severe_ward": max_severe_ward,
+        "ward_eligible_sofa_max": ward_eligible_sofa_max,
+        "ward_patients": ward_patients,
+        "n_ward_assigned": len(ward_patients),
+        "n_severe_ward": n_severe_ward,
+        "ward_existing": int(ward_occupancy),
+        "ward_census": int(ward_occupancy) + len(ward_patients),
         "split": split,
         "split_meta": split_meta,
         "objective_scaling": {
@@ -909,13 +1016,21 @@ def run_assignment(
         # These business metrics are independent of lambda coefficients, so
         # results from different tuning runs can be compared directly.
         "evaluation": {
-            "assignment_rate": round(assigned_count / n, 4),
+            "assignment_rate": round(served_count / n, 4),
+            "icu_assignment_rate": round(assigned_count / n, 4),
             "priority_total": round(assigned_priority_total, 4),
+            "served_priority_total": round(served_priority_total, 4),
             "avg_assigned_priority": round(
                 assigned_priority_total / assigned_count, 4
             ) if assigned_count else 0.0,
+            "avg_served_priority": round(
+                served_priority_total / served_count, 4
+            ) if served_count else 0.0,
             "high_risk_assigned_rate": round(
                 high_risk_assigned / high_risk_total, 4
+            ) if high_risk_total else 1.0,
+            "high_risk_served_rate": round(
+                high_risk_served / high_risk_total, 4
             ) if high_risk_total else 1.0,
             "overload_penalty": f2_val,
             "balance_deviation": balance_dev,
@@ -926,12 +1041,22 @@ def run_assignment(
             "avg_wait_hours": round(sum(wait_values) / n, 2) if candidate_rows is None else None,
             "max_wait_hours": round(max(wait_values), 2) if candidate_rows is None else None,
             # ── business metrics (lambda-independent, clinical meaning) ──
-            "unassigned": n - assigned_count,
+            "unassigned": n - served_count,
             "moved_patients": f5_val,
-            "high_risk_waiting": max(high_risk_total - high_risk_assigned, 0),
+            "high_risk_waiting": max(high_risk_total - high_risk_served, 0),
             "avg_assigned_sofa": round(
                 assigned_sofa_total / assigned_count, 4
             ) if assigned_count else 0.0,
+            "avg_ward_sofa": round(
+                ward_sofa_total / len(ward_patients), 4
+            ) if ward_patients else 0.0,
+            "ward_occupancy": len(ward_patients),
+            "ward_existing": int(ward_occupancy),
+            "ward_census": int(ward_occupancy) + len(ward_patients),
+            "severe_ward_count": n_severe_ward,
+            "ward_eligible": sum(ward_eligible),
+            "ward_priority_total": round(ward_priority_total, 4),
+            "served_sofa_total": round(served_sofa_total, 4),
             "isolation_utilization": round(
                 n_iso_used / n_iso_beds, 4
             ) if n_iso_beds else 0.0,
@@ -942,6 +1067,9 @@ def run_assignment(
         "resources": {
             "isolation_beds_used": f"{n_iso_used}/{n_iso_beds}",
             "ventilators_used": f"{n_vent_used}/{n_vents}",
+            "ward_beds_used": (
+                f"{int(ward_occupancy) + len(ward_patients)}/{n_ward_beds}"
+            ),
             "zone_matches": f"{n_zone_match}/{len(assignments)}",
         },
         "top_assignments": assignments,

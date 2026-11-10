@@ -43,22 +43,30 @@ docker compose -p icu_scheduling up -d   # PostgreSQL 端口 5434
 psql -h localhost -p 5434 -U postgres -d icu_scheduling -f migrations\001_layer1_schemas.sql
 psql -h localhost -p 5434 -U postgres -d icu_scheduling -f migrations\002_staging_icustays.sql
 psql -h localhost -p 5434 -U postgres -d icu_scheduling -f migrations\003_sequence_grants.sql
+psql -h localhost -p 5434 -U postgres -d icu_scheduling -f migrations\004_icustays_units.sql
+psql -h localhost -p 5434 -U postgres -d icu_scheduling -f migrations\006_rolling_state.sql
 ```
+
+`005` 保留给尚未实现的 P5 Pareto 持久化，建表时先跳过。
 
 ## 入口
 
 ```powershell
 $env:PYTHONPATH = (Get-Location)
 .\.venv\Scripts\python.exe -m application.simulate
+# 写入 sched.rolling_runs / rolling_decisions
+.\.venv\Scripts\python.exe -m application.simulate --persist
 ```
 
 | 用途 | 入口 |
 |------|------|
-| 滚动仿真(CLI) | `python -m application.simulate` |
+| H=1 在线滚动(CLI) | `python -m application.simulate` |
 | 六分量 SOFA 小样本 | `python -m application.prepare_sofa_sample` |
 | 带时间标签的滚动 Pareto | `python -m application.run_timed_pareto --input artifacts/sofa_sample/sofa_sample.json` |
 | 读取分床方案 | `from application.plan import get_plan, run_simulation_with_plan` |
 | 策略入口 | `from application.optimize import optimize` |
+
+`application.simulate.run_simulate(..., persist=True)` 会把每一步写入 `sched.rolling_runs` / `sched.rolling_decisions`；迁移见 `migrations/006_rolling_state.sql`。普通病房层由 `configs/optimizer.yaml` 的 `ward.n_beds` 控制，默认 `0` 关闭。
 
 小样本复跑命令见 [D3/P8 任务说明](MULTIOBJECTIVE_TASKS.md#p8-滚动层接入小样本回放)，评分口径见 [SOFA_SCORING.md](SOFA_SCORING.md)。
 

@@ -101,6 +101,51 @@
 - 代码改用 `staging.icustays_v.elapsed_hours`，不再在 Python 中做 `* 24` 换算。
 - 状态：已完成（2026-10-28）。
 
+### D5 普通病房层与 f2 重症错配（已完成）
+
+**目标**：把 $f_2$ 从"所有非 ISO 床位的 SOFA 总量"改为"重症患者被放进普通病房"的计数，并保证与 $f_1$ 不共线。
+
+**模型**：
+
+- ICU 床 $B_{ICU}$ 仍由 $x_{ib}$ 分配；
+- 新增普通病房容量池 $W$ 和每位患者的病房去向变量 $z_i\in\{0,1\}$；
+- 约束：
+  - $\sum_{b\in B_{ICU}}x_{ib}+z_i\le1$；
+  - $\sum_i z_i+\text{ward\_existing}\le W$；
+  - $z_i=0$ 若患者不具备病房资格（`eligible_sofa_max`）；
+  - $\sum_i x_{ib}\le1$。
+- 目标：
+  - $f_1=\sum_i p_i(\sum_b x_{ib}+z_i)$（ICU + 病房的总优先级服务量）；
+  - $f_2=\sum_i \mathbf{1}[s_i\ge\theta]z_i$（重症病房错配计数）；
+  - $f_0$ 仍是 ICU 占床；$f_3/f_4/f_5$ 仍只定义在 ICU 床上。
+
+**为什么不再共线**：重症住 ICU 只增加 $f_1$，不增加 $f_2$；非重症住病房只增加 $f_1$，不增加 $f_2$；只有"重症 + 病房"同时发生才增加 $f_2$。因此 $f_1$ 的支撑集是 ICU/病房服务，$f_2$ 的支撑集是 severe×ward，二者不可能写成同一个变量的比例变换。
+
+**安全阀**：
+
+- `max_severe_ward = K`：硬约束 $f_2\le K$。$K=0$ 表示重症绝不去病房，此时 $f_2\equiv0$，不应再把它当目标；权衡实验取 $K\ge1$。
+- `eligible_sofa_max`：病房资格上限；默认 24 允许全部评分患者，调低可模拟 step-down 规则。
+
+**实现**：
+
+- `configs/optimizer.yaml` 新增 `ward` 段：`n_beds`、`severity_threshold`、`max_severe_ward`、`eligible_sofa_max`；默认 `n_beds: 0` 关闭，保持旧行为。
+- `ModelContext` 新增 `n_ward_beds`、`ward_active`、`severe_flags`、`ward_vars`。
+- `_overload` 在 `ward_active` 时只对 severe×ward 求和；`_wait` 同时计入 ICU 与病房；`_bound_wait` 使用 `n_beds + n_ward_beds`。
+- `run_assignment` 新增 `ward_occupancy`（已有病房占用）和病房容量/资格/`max_severe_ward` 约束；返回 `ward_patients`、`n_ward_assigned`、`n_severe_ward`、`ward_census` 等字段。
+- 测试：`tests/test_ward_mismatch.py` 7 项，覆盖 f2 只计重症病房、$K=0$、病房容量、旧模式兼容、$K>W$ 报错、资格过滤、已有病房 census。
+- 持久化：`sched.assignments` 仍只保存 ICU 床位；病房去向保存在 rolling decision 的 JSON 中，不把 ward 伪造成 `bed_id`。
+
+**实测（P4 step 0，8 ICU + 10 病房，pivot=wait，$\varepsilon_2$ 扫描）**
+
+| $\varepsilon_2$ | ICU | 病房 | 重症病房 | $f_1$ | $f_2$ | $f_4$ |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 8 | 10 | 0 | 30,900 | 0 | 5 |
+| 1 | 8 | 10 | 1 | 31,300 | 1 | 7 |
+| 2 | 8 | 10 | 2 | 31,700 | 2 | 8 |
+| 4 | 8 | 10 | 4 | 32,000 | 4 | 5 |
+
+放松重症病房上限会提高总优先级服务量，同时增加重症错配；这是独立于旧 $f_1=1000f_0+100f_2$ 恒等式的真实权衡。
+
 ### 验收标准
 
 - D1：`isolation.mode=none` 时单轮分配数明显高于 13，且模型可正常求解。
@@ -337,7 +382,7 @@ $$
 4. **拐点端点按第一轴全域取最小/最大**，不用字典序 `argmax`。后者可能返回两个几乎重合的点，弦长塌缩到 0.14 而垂距 0.67，`prominence` 虚高到 4.67。
 5. **拐点必须报"显著度"**：`prominence` = 垂距 / 弦长，门槛 `KNEE_MIN_PROMINENCE = 0.02`。低于门槛时 `knee_source=None` 而不是硬报一个点。ε 扫描的常见形态就是一条直线（每档 ε 换固定量的 $f_1$），直线前沿**没有拐点**，硬报出来的只是采样间距的产物。
 
-**验收（阶段 A，2026-11-09 实跑）**
+**验收（阶段 A，当前口径）**
 
 命令：
 
@@ -350,13 +395,14 @@ $env:PYTHONPATH = (Get-Location)
 
 | 验收项 | 结果 |
 |--------|------|
-| 阶段 A 产出 ≥ 20 个非支配解 | ✅ 每步 7–14，13 步合计 **139** 个 |
-| 每个点满足 $f_k\le\varepsilon_k$ | ✅ 逐点断言通过 |
-| 前沿中不存在被支配点 | ✅ `_front` 过滤后 139 点全非支配 |
-| 网格规模 | 48–80 点/步（受 guard 下限裁剪，可行 48–80，几乎不丢点） |
-| 非支配比 | 0.088–0.25 |
-| 超体积（归一化，PURE 锚点，ref=$-0.05$） | 0.6614–0.9170，均值 **0.8205** |
-| 有显著拐点的步数 | **9/13**；其余 4 步（2、3、5、9）前沿在 $(f_1,f_2)$ 平面上是直线，按门槛正确报 `None` |
+| 阶段 A 产出 ≥ 20 个非支配解 | ✅ 每步 8–25，13 步合计 **161** 个 |
+| 每个网格点满足 $f_k\le\varepsilon_k$ | ✅ 逐点断言通过 |
+| 前沿中不存在被支配点 | ✅ `_front` 过滤后 161 点全非支配；候选集含参考解与 6+5 锚点 |
+| 网格规模 | 40–80 点/步（整数档位去重后 816 点；可行 815） |
+| 候选规模 | 每步 52–92 个（网格 + 1 参考 + 6 pure + 5 practical） |
+| 非支配比 | 0.098–0.275（分母为全部可行候选） |
+| 超体积（3D：wait/overload/zone_mismatch，PURE 锚点，ref=$-0.05$） | 0.6468–0.9564，均值 **0.8238** |
+| 有显著拐点的步数 | **13/13**；拐点来源含 `epsilon:*` 与 `anchor:pure:balance`，几何拐点不等同于独立目标权衡 |
 | $f_3$ 结构断言 | ✅ 全程 0，与 $f_0=20$、5 区 × 4 床的结构最小值一致 |
 | 患者守恒 | ✅ 13/13 步 `patient_conservation: true` |
 | 总耗时 | 每步 `--max-time 3` 上限内，全扫描分钟级 |
@@ -364,9 +410,9 @@ $env:PYTHONPATH = (Get-Location)
 
 **主要发现**
 
-- **$f_1 \leftrightarrow f_2$ 存在真实的单调权衡**：放松过载上限能换到更高优先级服务量。step 0 从 $f_2=41\Rightarrow f_1=22100$ 一直走到 $f_2=149\Rightarrow f_1=34900$，几乎严格线性——这正是"每档 ε 换固定量 $f_1$"的形态，也解释了为什么那一步的 prominence 只有 0.056。
-- **拐点普遍落在 $\varepsilon_2$ 第 2 档**（9 步里 7 步是 `epsilon:2`）：相对执行值只让出 1.5%–3% 的 $f_1$，却把 $f_2$ 从执行值压到接近 ideal。这是给 P7 "推荐方案"最有用的输出。
-- **$f_5$ 全程为 0**：稠密 ε 网格里挪床从未被选中，与 P6 的结论一致——"不动床"本身就是加权意义上的最优，不是 λ 没调好。
+- **当前 legacy 优先级下 $f_1$ 与 $f_2$ 是同一个变量**：$f_1=1000f_0+100f_2$，815 个可行点全部成立。前沿在 $(f_1,f_2)$ 平面上的直线斜率是恒等式，不是"每档 ε 换固定量 $f_1$"的独立权衡。要得到独立权衡，必须使用 `composite` 优先级或 §3.6 的 ward-f2；P4 的二维网格不能单独证明 $f_1\leftrightarrow f_2$ 冲突。
+- **几何拐点普遍落在 $\varepsilon_2$ 第 2 档**（13 步里 7 步是 `epsilon:2`）；step 0 是 `epsilon:10`，step 4 是 `anchor:pure:balance`。拐点只作为几何输出，不能越过上面的恒等式直接解释为"推荐方案"。
+- **执行参考解 $f_5=0$**；但在未加 move 轴的网格里，前沿备选 $f_5$ 可达 0–19，不能把前沿点当成稳定可执行方案。需要稳定性时使用 `--move-axis-levels` 或 `max_moves`。
 
 **未做/留待后续**
 
@@ -403,9 +449,11 @@ $env:PYTHONPATH = (Get-Location)
 | 累计 $f_4$ | 11 | **67** |
 | 累计 $f_1$ | 431,200 | 425,800（−1.25%，更多优先给病区匹配） |
 | 累计 $f_2$ | 1,712 | 1,658 |
-| 非支配点合计 | 139 | 159 |
-| HV 均值 | 0.8205 | 0.3074（**不可比**，归一化基准变了） |
-| 有显著拐点步数 | 9/13 | 9/13 |
+| 非支配点合计 | 139 | 161（含参考解与 6+5 锚点） |
+| HV 均值（3D） | 0.8205 | **0.8238** |
+| 有显著拐点步数 | 9/13 | 13/13（几何拐点） |
+
+> 历史数字 0.3074 是"把自由 churn 的 move 当第 4 维"的 HV，不是 f4 修正造成的质量下降；3D 重算为 0.8238。
 
 **新出现的权衡**：前沿里出现 occupancy = 18 的点（guard 下限）。原因是「不收入某个患者」可以让他的错配不计数，于是 $f_0\downarrow$ 换 $f_4\downarrow$。这是修正后才显形的真实权衡，之前被 ISO 万能位掩盖。
 
@@ -429,6 +477,45 @@ $env:PYTHONPATH = (Get-Location)
 
 因此本轮 P4 结论统一在**转出关闭**下给出，保持与既有报告可比；转出效果作为 P7 的独立实验（同池重评估）处理。
 
+
+### P4 当前实现：前沿候选集与 move 显式 ε 轴（2026-11-10）
+
+每步的非支配过滤候选集固定为：
+
+```text
+1 个加权和参考解
++ 6 个 pure 锚点（occupancy/wait/overload/balance/zone_mismatch/move）
++ 5 个 practical 锚点（practical occupancy 复用 pure）
++ 全部 ε 网格点
+```
+
+因此 `n_candidates = n_grid + 12`；`n_feasible` 仍表示网格可行点数，`n_feasible_candidates` 表示全部可行候选数，`nondominated_ratio = |front| / n_feasible_candidates`。参考解/锚点优先参与去重，重复目标向量归因于 `reference` 或 `anchor:*`，而不是被网格标签覆盖。pure 锚点中的零分配解是数学边界（用于理想点/最差点），不是可执行方案；实际可执行候选是参考解、practical 锚点和带占用 guard 的网格点。
+
+`move` 的两种写法：
+
+- `--move-levels q`：单独的一维稳定性扫描；
+- `--move-axis-levels q`：把 `move` 并入 `--axis-levels`，成为非对称网格的第三个 ε 轴，并与 `--move-levels` 互斥。
+
+质量指标只使用网格中显式出现的轴。P4 主网格不包含 move，因此 HV 固定为 3D（`wait/overload/zone_mismatch`）；只有显式加入 move 轴时才计算 4D HV。这样不会因为求解器在无 move 约束时自由换床，就把 move 自动塞进 HV。
+
+当前 3D 基线（50 例 / 20 床 / 12 步 / seed 42 / `overload=10,zone_mismatch=8`）的复跑结果：
+
+| 指标 | 当前值 |
+|---|---|
+| 网格 / 可行 / 候选 | 816 / 815 / 972 |
+| 非支配点 | 161 |
+| $f_0$ 执行解 | 20/20 每步 |
+| 累计 $f_1$ / $f_2$ / $f_4$ / $f_5$ | 425,800 / 1,658 / 67 / 0 |
+| 3D HV | 0.6468–0.9564，均值 0.8238 |
+| 拐点 | 13/13 有几何拐点 |
+
+复跑命令：
+
+```powershell
+python -m application.run_timed_pareto --input artifacts/sofa_sample/sofa_sample.json `
+  --output reports/rolling/p4_dense_grid.json --sample-size 50 --beds 20 --steps 12 --seed 42 `
+  --axis-levels overload=10,zone_mismatch=8 --max-time 3
+```
 
 ---
 
@@ -609,10 +696,57 @@ $$f_1=\sum_i w_i\sum_b x_{ib}$$
 
 #### 其他须披露的语义
 
-- 转出即**离开床池且不返回**，未建模普通病房
+- 转出即**离开床池且不返回**；普通病房作为独立去向由 `ward` 层建模，不经过 $x^{out}$
 - 优先级并列时转出对目标无差别，求解器在并列解中任意选取
 - 转出**不计入 $f_5$**（离开不是挪床），$f_5$ 语义不变
 - 当前闸门 $s^*=2$ 下 13 步只有 19 人次达标，转出机会稀疏
+
+### P6 补记：H=1 在线滚动引擎（2026-11-10）
+
+**理论**：第 $k$ 步只使用截至 $\tau_k$ 的状态：
+
+- $O_k$：在院且已占床的患者；
+- $W_k$：等待队列；
+- $P_k$：尚未进入等待队列的待到达患者；
+- $D_k,T_k,G_k$：已出院、已转出、已转普通病房的患者。
+
+事件处理只改变 $O_k,W_k,P_k$，不直接填床；随后用 $(O_k\cup W_k)$ 构建候选快照，以 $o_i$ 为上一轮床位，求解一次静态 CP-SAT：
+
+$$
+\min_x\ \sum_k\lambda_k f_k(x)\quad
+\text{s.t. }x\in\mathcal{X},\quad
+\sum_b x_{ib}+z_i+x^{out}_i=1\ (i\in O_k)
+$$
+
+只提交当前步的 $\{x_{ib},z_i,x^{out}_i\}$，下一步重新求解。H=1 是"在线滚动但 myopic"；H>1 的 rolling-horizon 属于下一阶段。
+
+**实现**：
+
+- `domain/rolling/engine.py`：`run_rolling_simulation`，每步调用一次 `run_assignment`，候选来自当前状态；不再"随机出院后按顺序填床"。
+- 状态转移：`waiting/pending/occupied/discharged/transferred/warded` 六集合互斥且覆盖全部患者；每一步检查患者守恒。
+- 只提交当前步：`occupied` 来自本轮 `top_assignments`，历史快照不被后续出院修改。
+- 持久化：`data_access/rolling_repo.py` + `migrations/006_rolling_state.sql`，表 `sched.rolling_runs` 与 `sched.rolling_decisions`；`(run_id, step)` 唯一，JSONB 保存 objective/assignments/state。（005 保留给尚未实现的 P5 Pareto 持久化。）
+- L4：`application.simulate.run_simulate` 调用该引擎；`application.plan.run_simulation_with_plan` 从最后一个决策快照生成 plan，不再把静态 `run_assignment()` 和另一条 rolling 指标拼接。
+- 测试：`tests/test_rolling_online.py` 6 项，覆盖每步重解、previous_beds 传递、持久化回调、出院不修改历史、L4 plan 使用最后决策、真实 CP-SAT。
+
+**13 步实测（50 例、20 床、seed 42、初始候选 40、进出率 0.05）**
+
+| 指标 | 无病房 | 10 床病房 |
+|---|---:|---:|
+| 总入院（unique ICU） | 32 | 32 |
+| 总出院 | 12 | 12 |
+| 期末 ICU 占用 | 20 | 20 |
+| 期末等待 | 18 | 8 |
+| 总服务（ICU+病房） | 32 | 42 |
+| 累计 $f_0$ | 260 | 260 |
+| 累计 $f_1$ | 449,400 | 452,300 |
+| 累计 $f_2$ | 1,894 | 0 |
+| 累计 $f_4$ | 52 | 54 |
+| 累计 $f_5$ | 0 | 0 |
+| 求解状态 | 13/13 OPTIMAL | 13/13 OPTIMAL |
+| 患者守恒 | 13/13 | 13/13 |
+
+说明：无病房模式的 $f_2=1{,}894$ 仍是历史 SOFA 口径；启用病房后 $f_2$ 才是"重症病房计数"。该实测使用 hour-24 之前的静态 SOFA/优先级，尚未接入每步更新的 SOFA 时间序列；病房层目前按"进病房后不再返回 ICU、也不再从病房出院"的保守口径处理，因此病房 census 会在早期填满。H>1 的时间索引模型、病房出院和预测属于后续工作。
 
 ---
 
@@ -706,7 +840,11 @@ $env:PYTHONPATH = (Get-Location)
 # 锚点求解（P3）
 .\.venv\Scripts\python.exe -m application.pareto
 
-# 六分量 SOFA 小样本 + 滚动 Pareto 回放（P6，已完成）
+# H=1 在线滚动（每步 CP-SAT；--persist 写入 rolling_runs/decisions）
+.\.venv\Scripts\python.exe -m application.simulate
+.\.venv\Scripts\python.exe -m application.simulate --persist
+
+# 六分量 SOFA 小样本 + 滚动 Pareto 回放
 .\.venv\Scripts\python.exe -m application.prepare_sofa_sample --zip ..\mimic-iv-3.1.zip --size 50 --seed 42
 .\.venv\Scripts\python.exe -m application.run_timed_pareto --input artifacts/sofa_sample/sofa_sample.json --steps 12 --seed 42 --levels 2 --max-time 3
 
@@ -724,4 +862,6 @@ $env:PYTHONPATH = (Get-Location)
 | P5 | `data_access/pareto_repo.py`、`migrations/005_pareto_solutions.sql` | — |
 | **D3** | `domain/scoring/sofa_full.py`、`data_access/mimic_sample.py`、`application/prepare_sofa_sample.py` | — |
 | **P6** | `domain/rolling/timed_pareto.py`、`application/run_timed_pareto.py` | `domain/optimizer/cp_sat.py`、`domain/optimizer/pareto.py` |
+| **D5 f2** | `tests/test_ward_mismatch.py` | `domain/optimizer/objectives.py`、`domain/optimizer/cp_sat.py`、`configs/optimizer.yaml` |
+| **P6 H=1** | `data_access/rolling_repo.py`、`migrations/006_rolling_state.sql`、`tests/test_rolling_online.py` | `domain/rolling/engine.py`、`application/simulate.py`、`application/plan.py` |
 | **P7** | `domain/optimizer/front_quality.py`、`domain/optimizer/nsga2.py`、`application/front_quality.py` | — |

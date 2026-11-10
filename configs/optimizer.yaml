@@ -27,6 +27,19 @@ resources:
   - - 17
     - 4
     - NICU
+ward:
+  # General-ward capacity pool.  0 disables the ward extension and keeps the
+  # legacy f2 = SOFA over non-isolation ICU beds.  n_beds > 0 turns f2 into
+  # "severe patients placed in a general ward" (ICU occupancy only).
+  n_beds: 0
+  severity_threshold: 8
+  # Hard safety cap on the number of severe patients allowed in the ward.
+  # 0 would make f2 a hard rule (no severe overflow); use >0 for trade studies.
+  max_severe_ward: 2
+  # A patient is ward-eligible only when SOFA <= this value.  The default 24
+  # admits every scored patient; lower it to model a step-down eligibility rule.
+  eligible_sofa_max: 24
+
 isolation:
   # none: no patient requires isolation; ISO beds are ordinary capacity
   # careunit_keyword: legacy heuristic (ICU unit name -> isolation), baseline only

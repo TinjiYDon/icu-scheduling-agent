@@ -11,7 +11,7 @@ import json
 import math
 import random
 from bisect import bisect_right
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
 from itertools import product
 from pathlib import Path
@@ -201,30 +201,23 @@ def _dominates(left: Mapping[str, float], right: Mapping[str, float]) -> bool:
 
 def quality_objective_names(
     grid: Sequence[Mapping[str, int]],
-    front_values: Sequence[Mapping[str, int]],
 ) -> list[str]:
     """Objectives a front's quality (hypervolume / knee) should be scored on.
 
-    The pivot, plus whichever epsilon axes the grid actually sweeps, plus any
-    other objective the front genuinely trades.
+    The pivot plus the epsilon axes the grid **explicitly** sweeps.  A column
+    that merely varies because the solver is free to churn on it (the classic
+    case is ``move`` when no move budget is in force) must not be promoted into
+    the quality space: it would silently change the hypervolume dimension and
+    reward or punish arbitrary tie-breaking rather than a designed trade-off.
 
-    Scoring every objective would let a compressed axis carry the same weight as
-    a genuinely traded one -- occupancy only moves inside the guard band (e.g.
-    18..20) yet would dominate the knee choice.  Conversely, an axis the solver
-    is free to churn on (``move`` when no budget is in force) produces front
-    points that differ only in that axis; leaving it out rates a 19-move plan
-    and a 0-move plan identically.  A column that is constant across the whole
-    front is dropped because it carries no information and would only rescale
-    every hypervolume by a fixed factor.
+    ``move`` is therefore included only when it is an explicit axis -- via
+    ``level_map`` / ``move_axis_levels``, the ``move_levels`` mode, or the
+    symmetric three-axis grid.  Occupancy is never scored here; it is a guard.
     """
     names = ["wait"]
     first = grid[0] if grid else {}
     for name in GRID_OBJECTIVES:
         if name in first:
-            names.append(name)
-            continue
-        column = [v[name] for v in front_values if name in v]
-        if column and max(column) - min(column) >= 1:
             names.append(name)
     return names
 
@@ -243,6 +236,54 @@ def _front(points: list[dict]) -> list[dict]:
     ]
 
 
+def _candidate_point(
+    *,
+    source: str,
+    result: Mapping[str, Any],
+    values: Mapping[str, float],
+    candidates: set[int],
+    n_beds: int,
+    epsilon_bounds: Mapping[str, int] | None = None,
+) -> dict:
+    """Wrap one already-evaluated solution in the point schema used by ``_front``."""
+    status = str(result.get("solver_status") or "UNKNOWN")
+    point = {
+        "source": source,
+        "status": status,
+        "values": dict(values) if status in FEASIBLE else {},
+        "extras": {
+            "epsilon_bounds": dict(epsilon_bounds) if epsilon_bounds else None,
+        },
+    }
+    if status in FEASIBLE:
+        point["extras"]["assignments"] = _assignments(result, candidates, n_beds)
+    return point
+
+
+def _anchor_candidate_point(
+    *,
+    kind: str,
+    name: str,
+    record: Mapping[str, Any],
+    candidates: set[int],
+    n_beds: int,
+) -> dict:
+    """Convert a ``solve_anchors`` record to a front candidate."""
+    top = list(record.get("top_assignments") or [])
+    result = {
+        "solver_status": record.get("solver_status") or "OPTIMAL",
+        "assigned": len(top),
+        "top_assignments": top,
+    }
+    return _candidate_point(
+        source=f"anchor:{kind}:{name}",
+        result=result,
+        values=record.get("objectives") or {},
+        candidates=candidates,
+        n_beds=n_beds,
+    )
+
+
 def run_timed_pareto(
     payload: Mapping[str, Any],
     *,
@@ -258,6 +299,7 @@ def run_timed_pareto(
     discharge_rate: float = 0.05,
     levels: int = 2,
     move_levels: int | None = None,
+    move_axis_levels: int | None = None,
     level_map: Mapping[str, int] | None = None,
     occupancy_ratio: float = 0.9,
     max_time_seconds: float = 3.0,
@@ -272,6 +314,10 @@ def run_timed_pareto(
 
     Execute the existing weighted baseline; compare its per-step alternatives
     with an epsilon scan, all sharing the exact same predecision state.
+
+    ``move_axis_levels`` is the explicit way to add ``move`` to an asymmetric
+    ``level_map`` grid.  ``move_levels`` retains the older one-dimensional
+    stability scan and is mutually exclusive with it.
     """
     config = load_yaml("optimizer.yaml")
     configured = config["resources"]
@@ -283,6 +329,28 @@ def run_timed_pareto(
         raise ValueError("Use a 2h decision step, nonnegative warmup, and levels>=2")
     if move_levels is not None and move_levels < 2:
         raise ValueError("move_levels must be >= 2 when provided")
+    if move_axis_levels is not None:
+        if move_levels is not None:
+            raise ValueError(
+                "move_axis_levels and move_levels are mutually exclusive"
+            )
+        if move_axis_levels < 2:
+            raise ValueError("move_axis_levels must be >= 2 when provided")
+        if level_map is None:
+            raise ValueError(
+                "move_axis_levels requires level_map with at least one other axis"
+            )
+        if "move" in level_map:
+            raise ValueError(
+                "move_axis_levels conflicts with an explicit move key in level_map"
+            )
+        if not any(int(q) > 1 for name, q in level_map.items() if name != "move"):
+            raise ValueError(
+                "move_axis_levels requires an active non-move axis in level_map"
+            )
+        # Make move a first-class axis of the asymmetric grid.  It is then an
+        # upper bound in every solve, not an arbitrary dimension of the front.
+        level_map = {**level_map, "move": move_axis_levels}
     if level_map is not None:
         unknown = set(level_map) - set(GRID_OBJECTIVES)
         if unknown:
@@ -496,13 +564,36 @@ def run_timed_pareto(
             return result
 
         reference = require_solution()
-        assignments = _assignments(reference, set(candidate_ids), n_beds)
+        candidate_set = set(candidate_ids)
+        assignments = _assignments(reference, candidate_set, n_beds)
         values = objective_vector(reference)
+        reference_point = _candidate_point(
+            source="reference",
+            result=reference,
+            values=values,
+            candidates=candidate_set,
+            n_beds=n_beds,
+        )
         payoff = solve_anchors(
             practical_guard_ratio=occupancy_ratio, solve=require_solution
         )
         # Anchor run IDs are ephemeral and do not affect this replay.
         payoff.pop("run_id")
+        # The practical occupancy anchor is a re-use of the pure occupancy
+        # anchor (solve_anchors skips the duplicate solve), so the replay gets
+        # the documented 6 pure + 5 practical anchors.
+        anchor_points = [
+            _anchor_candidate_point(
+                kind=kind,
+                name=name,
+                record=record,
+                candidates=candidate_set,
+                n_beds=n_beds,
+            )
+            for kind in ("pure", "practical")
+            for name, record in payoff[kind].items()
+            if not (kind == "practical" and name == "occupancy")
+        ]
         occupancy_floor = payoff["guard"]["occupancy_min"]
         grid = _epsilon_grid(
             payoff, levels, move_levels=move_levels, level_map=level_map
@@ -537,21 +628,22 @@ def run_timed_pareto(
                     result, set(candidate_ids), n_beds
                 )
             points.append(point)
-        front = _front(points)
+        # The reference and all payoff anchors were solved from the same
+        # pre-decision state; excluding them from the non-dominance filter can
+        # keep points that the executed reference already dominates.  Extras go
+        # first so a duplicate objective vector is attributed to the reference /
+        # anchor rather than silently replaced by a grid label.
+        candidates = [reference_point, *anchor_points, *points]
+        front = _front(candidates)
         # Front quality uses the PURE anchors for normalisation (P3 decision:
         # normalise on the mathematical ideal/nadir) so the numbers stay tied to
         # the instance rather than to whichever practical grid was swept.
         #
-        # Only the objectives this scan actually explores are scored: the pivot
-        # plus whichever epsilon axes are active.  Including every objective
-        # would let a compressed axis (occupancy only spans the guard band, e.g.
-        # 18..20) carry the same weight as a genuinely traded one and dominate
-        # the knee choice.
-        #
-        # ``move`` joins the set when the front genuinely trades it (see
-        # quality_objective_names for why both inclusion and exclusion matter).
+        # Only objectives the scan **explicitly** explores are scored: the pivot
+        # plus the epsilon axes present in the grid.  In particular, move is not
+        # silently promoted when it merely varies because it was unconstrained.
         front_values = [dict(p["values"]) for p in front if p["values"]]
-        quality_names = quality_objective_names(grid, front_values)
+        quality_names = quality_objective_names(grid)
         quality_senses = {
             name: OBJECTIVES[name].sense for name in quality_names if name in OBJECTIVES
         }
@@ -573,12 +665,19 @@ def run_timed_pareto(
             "max_moves": max_moves,
             "levels": levels,
             "move_levels": move_levels,
+            "move_axis_levels": move_axis_levels,
             "level_map": dict(level_map) if level_map else None,
             "n_grid": len(grid),
             "n_feasible": sum(p["status"] in FEASIBLE for p in points),
+            "n_candidates": len(candidates),
+            "n_feasible_candidates": sum(
+                p["status"] in FEASIBLE for p in candidates
+            ),
             "n_nondominated": len(front),
             "nondominated_ratio": round(
-                len(front) / max(1, sum(p["status"] in FEASIBLE for p in points)), 4
+                len(front)
+                / max(1, sum(p["status"] in FEASIBLE for p in candidates)),
+                4,
             ),
             "hypervolume": quality["hypervolume"],
             "knee_index": knee_index,
@@ -698,6 +797,7 @@ def run_timed_pareto(
             "discharge_rate": discharge_rate,
             "levels": levels,
             "move_levels": move_levels,
+            "move_axis_levels": move_axis_levels,
             "level_map": dict(level_map) if level_map else None,
             "grid_objectives": list(GRID_OBJECTIVES),
             "occupancy_ratio": occupancy_ratio,
@@ -753,6 +853,14 @@ def main() -> None:
         help="dense 1-D scan on move (f5); pins the other epsilon axes at their "
         "practical ideal to trace the stability-yield curve",
     )
+    parser.add_argument(
+        "--move-axis-levels",
+        type=int,
+        default=None,
+        help="add move as an explicit epsilon axis to --axis-levels, e.g. "
+        "'--axis-levels overload=10,zone_mismatch=8 --move-axis-levels 3'; "
+        "mutually exclusive with --move-levels",
+    )
     parser.add_argument("--max-time", type=float, default=3.0)
     parser.add_argument(
         "--sofa-transfer-max",
@@ -800,6 +908,7 @@ def main() -> None:
         seed=args.seed,
         levels=args.levels,
         move_levels=args.move_levels,
+        move_axis_levels=args.move_axis_levels,
         level_map=level_map,
         max_time_seconds=args.max_time,
         sofa_transfer_max=args.sofa_transfer_max,

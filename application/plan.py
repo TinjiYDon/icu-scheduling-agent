@@ -1,4 +1,4 @@
-"""L4 API: fetch bed assignment plan from latest simulation run."""
+"""L4 API: fetch an assignment plan from the rolling decision history."""
 
 from __future__ import annotations
 
@@ -6,12 +6,11 @@ from typing import Any
 
 from application.simulate import run_simulate
 from data_access.assignments_repo import fetch_assignments, latest_run_id, run_exists
-from domain.optimizer.cp_sat import run_assignment
 from domain.optimizer.explain import explain_assignment
 
 
 def get_plan(run_id: str | None = None, sim_metrics: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Return assignment rows and summary metrics for a simulation run."""
+    """Return assignment rows and summary metrics for a persisted run."""
     if run_id is None:
         run_id = latest_run_id()
     if not run_id:
@@ -59,28 +58,47 @@ def get_plan(run_id: str | None = None, sim_metrics: dict[str, Any] | None = Non
 
 
 def run_simulation_with_plan(n_steps: int = 12) -> dict[str, Any]:
-    """L4: CP-SAT assignment + rolling occupancy summary (CLI / batch entry)."""
-    assign = run_assignment()
+    """Run the H=1 rolling scheduler and return the last committed plan."""
     rolling = run_simulate(n_steps=int(n_steps))
-    plan = get_plan(assign.get("run_id"), sim_metrics=assign)
-    # Prefer rich solver rows for demo table (zone_match / bed_type).
-    if assign.get("top_assignments"):
-        plan["assignments"] = list(assign["top_assignments"])
-    plan["explain"] = explain_assignment(assign)
-    ev = assign.get("evaluation") or {}
+    history = rolling.get("history") or []
+    last = history[-1] if history else {}
+    decision = last.get("decision") or {}
+    evaluation = decision.get("evaluation") or {}
+    assignments = list(decision.get("top_assignments") or [])
+    plan = {
+        "run_id": rolling.get("run_id"),
+        "step": last.get("step"),
+        "hour": last.get("hour"),
+        "assignments": assignments,
+        "metrics": {
+            "assigned": decision.get("assigned", 0),
+            "beds_used": len({a["bed_id"] for a in assignments}),
+            "n_stays": decision.get("n_stays"),
+            "n_beds": decision.get("n_beds"),
+            "solver_status": decision.get("solver_status"),
+            "unassigned": max(
+                int(decision.get("n_stays", 0)) - int(decision.get("assigned", 0)),
+                0,
+            ),
+            "assignment_rate": evaluation.get("assignment_rate"),
+            "zone_match_rate": evaluation.get("zone_match_rate"),
+            "objective": decision.get("objective"),
+            "resources": decision.get("resources"),
+        },
+        "status": "ok" if decision else "empty",
+    }
+    plan["explain"] = explain_assignment(decision) if decision else ""
     simulate = {
         **rolling,
-        "run_id": assign.get("run_id"),
-        "solver_status": assign.get("solver_status"),
-        "assigned": assign.get("assigned"),
-        "n_stays": assign.get("n_stays"),
-        "n_beds": assign.get("n_beds"),
-        "n_candidates": assign.get("n_stays"),
-        "evaluation": ev,
-        "objective": assign.get("objective"),
-        "resources": assign.get("resources"),
-        "high_risk_assigned_rate": ev.get("high_risk_assigned_rate"),
-        "zone_match_rate": ev.get("zone_match_rate"),
+        "run_id": rolling.get("run_id"),
+        "solver_status": decision.get("solver_status"),
+        "assigned": decision.get("assigned"),
+        "n_stays": decision.get("n_stays"),
+        "n_beds": decision.get("n_beds"),
+        "n_candidates": decision.get("n_stays"),
+        "evaluation": evaluation,
+        "objective": decision.get("objective"),
+        "resources": decision.get("resources"),
     }
     try:
         from infra.mlflow_util import log_run
@@ -98,13 +116,15 @@ def run_simulation_with_plan(n_steps: int = 12) -> dict[str, Any]:
                 "bed_utilization_pct": float(rolling.get("bed_utilization_pct") or 0),
                 "total_admissions": float(rolling.get("total_admissions") or 0),
                 "total_discharges": float(rolling.get("total_discharges") or 0),
-                "assigned": float(assign.get("assigned") or 0),
-                "high_risk_assigned_rate": float(ev.get("high_risk_assigned_rate") or 0),
-                "zone_match_rate": float(ev.get("zone_match_rate") or 0),
+                "assigned": float(decision.get("assigned") or 0),
+                "high_risk_assigned_rate": float(
+                    evaluation.get("high_risk_assigned_rate") or 0
+                ),
+                "zone_match_rate": float(evaluation.get("zone_match_rate") or 0),
             },
         )
         if rid:
             simulate["mlflow_run_id"] = rid
     except Exception as exc:  # noqa: BLE001
         simulate["mlflow_error"] = str(exc)
-    return {"simulate": simulate, "plan": plan, "assign": assign, "status": "ok"}
+    return {"simulate": simulate, "plan": plan, "assign": decision, "status": "ok"}

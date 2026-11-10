@@ -41,6 +41,10 @@ class ModelContext:
     prev_bed: Mapping[int, int]
     stay_ids: Sequence[int]
     zone_load_vars: list = field(default_factory=list)
+    n_ward_beds: int = 0
+    ward_active: bool = False
+    severe_flags: Sequence[bool] = field(default_factory=list)
+    ward_vars: Mapping[int, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -56,10 +60,25 @@ def _occupancy(model, x, ctx: ModelContext):
 
 
 def _wait(model, x, ctx: ModelContext):
-    return sum(ctx.weights[i] * x[i, b] for i in range(ctx.n) for b in range(ctx.n_beds))
+    total = sum(
+        ctx.weights[i] * x[i, b] for i in range(ctx.n) for b in range(ctx.n_beds)
+    )
+    if getattr(ctx, "ward_active", False):
+        total += sum(ctx.weights[i] * ctx.ward_vars[i] for i in range(ctx.n))
+    return total
 
 
 def _overload(model, x, ctx: ModelContext):
+    if getattr(ctx, "ward_active", False):
+        # Severe misplacement: only a severe patient placed in the general-ward
+        # pool contributes.  A severe ICU patient contributes to f1 (priority
+        # served) but not to f2; this is what breaks the old identity
+        # f1 = 1000*f0 + 100*f2.
+        return sum(
+            ctx.ward_vars[i]
+            for i in range(ctx.n)
+            if ctx.severe_flags[i]
+        )
     return sum(ctx.sofa_vals[i] * x[i, b] for i in range(ctx.n) for b in ctx.regular_beds)
 
 
@@ -142,10 +161,15 @@ def _bound_occupancy(ctx: ModelContext) -> int:
 
 
 def _bound_wait(ctx: ModelContext) -> int:
-    return max(1, ctx.n_beds * max(ctx.weights, default=1))
+    served_beds = ctx.n_beds
+    if getattr(ctx, "ward_active", False):
+        served_beds += ctx.n_ward_beds
+    return max(1, served_beds * max(ctx.weights, default=1))
 
 
 def _bound_overload(ctx: ModelContext) -> int:
+    if getattr(ctx, "ward_active", False):
+        return max(1, min(ctx.n, ctx.n_ward_beds))
     return max(1, ctx.n_beds * max(ctx.sofa_vals, default=1))
 
 
