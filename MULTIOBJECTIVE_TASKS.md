@@ -509,12 +509,29 @@ $env:PYTHONPATH = (Get-Location)
 | 3D HV | 0.6468–0.9564，均值 0.8238 |
 | 拐点 | 13/13 有几何拐点 |
 
+**稳定性约束补充（`max_moves=0`）**：同一实例下，把每步挪床上限设为 0，得到完全冻结的备选前沿：
+
+| 指标 | 无 move 约束 | `max_moves=0` |
+|---|---:|---:|
+| 网格 / 可行 / 候选 | 816 / 815 / 972 | 248 / 247 / 404 |
+| 非支配点 | 161 | 102 |
+| 3D HV 均值 | 0.8238 | 0.6876 |
+| 前沿 \(f_5\) 范围 | 0–19 | **0** |
+| 拐点步数 | 13/13 | 9/13 |
+
+两种口径的 HV 网格边界不同，只作描述性对比；稳定性约束下执行参考解的累计目标不变（\(f_1=425{,}800\)、\(f_2=1{,}658\)、\(f_4=67\)、\(f_5=0\)），因为原加权和参考解本身就是 \(f_5=0\)。冻结前沿的 102 个点全部 \(f_5=0\)，更适合作为可执行备选集。
+
 复跑命令：
 
 ```powershell
 python -m application.run_timed_pareto --input artifacts/sofa_sample/sofa_sample.json `
   --output reports/rolling/p4_dense_grid.json --sample-size 50 --beds 20 --steps 12 --seed 42 `
   --axis-levels overload=10,zone_mismatch=8 --max-time 3
+
+# 稳定性约束版本（每步 f5=0）
+python -m application.run_timed_pareto --input artifacts/sofa_sample/sofa_sample.json `
+  --output reports/rolling/p4_dense_grid_stable.json --sample-size 50 --beds 20 --steps 12 --seed 42 `
+  --axis-levels overload=10,zone_mismatch=8 --max-moves 0 --max-time 3
 ```
 
 ---
