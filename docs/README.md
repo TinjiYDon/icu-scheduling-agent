@@ -8,6 +8,7 @@
 | 文档 | 内容 |
 |---|---|
 | [TECHNICAL_OVERVIEW.md](TECHNICAL_OVERVIEW.md) | **技术总览（主入口）** |
+| [RESEARCH_PLAN.md](RESEARCH_PLAN.md) | **总目标 / 架构 / 下一步目标与验收（2026-11-11）** |
 | [MASTER_NARRATIVE.md](MASTER_NARRATIVE.md) | 总目标 · 总内容 · 一条链（SSOT） |
 | [STATUS.md](STATUS.md) | 进度与指标 |
 | [ROADMAP.md](ROADMAP.md) / [CHANGELOG.md](CHANGELOG.md) | 计划 / 变更记录 |
