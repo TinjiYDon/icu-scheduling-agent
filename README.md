@@ -29,6 +29,7 @@ $env:PYTHONPATH = (Get-Location)
 | [docs/DUMP_READY.md](docs/DUMP_READY.md) | **线下 dump 单发 / restore** |
 | [docs/TUNING_LOCAL.md](docs/TUNING_LOCAL.md) | Plotly Ops 台启动 |
 | [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) | **答辩演示口播** |
+| [docs/ICU_CASE_STUDY.md](docs/ICU_CASE_STUDY.md) | **12 人 Pareto 分床案例、实际去向对照边界与 2h 滚动** |
 | [docs/STATUS.md](docs/STATUS.md) | 当前进度与仿真 |
 | [docs/TEAM_DIRECTION.md](docs/TEAM_DIRECTION.md) | **组员方向同步（必读）** |
 | [docs/PROGRESS.md](docs/PROGRESS.md) | 里程碑完成度 |
