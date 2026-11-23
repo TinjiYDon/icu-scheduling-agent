@@ -739,6 +739,12 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["db", "synthetic"],
         help="候选池来源：db（MIMIC/RDS，默认）或 synthetic（仓内合成，不读 MIMIC）",
     )
+    p.add_argument(
+        "--isolation-mode",
+        default="config",
+        choices=["config", "none"],
+        help="隔离需求：config（默认，careunit 关键词）或 none（S1 正常负载敏感性实验）",
+    )
     p.add_argument("--out", default=None, help=f"输出 JSON（默认 {DEFAULT_OUT}）")
     p.add_argument("--smoke", action="store_true", help="快速自检：合成池 30 候选 / 1 seed / levels 2")
     p.add_argument("--verbose", action="store_true", help="打印每个 ε 格点的进度")
@@ -767,6 +773,7 @@ def resolve_cli_config(args: argparse.Namespace) -> dict[str, Any]:
     config = {
         "smoke": smoke,
         "source": source,
+        "isolation_mode": str(getattr(args, "isolation_mode", "config")),
         "scenarios": [s.id for s in scenarios],
         "seeds": list(range(seeds)),
         "levels": levels,
@@ -828,17 +835,26 @@ def main(argv: Sequence[str] | None = None, *, env: Mapping[str, str] | None = N
         def progress(i: int, n: int, bounds: Mapping[str, Any]) -> None:
             print(f"[grid] {i}/{n} bounds={dict(bounds)}", flush=True)
 
-    payload = run_grid(
-        scenarios=cfg["scenarios"],
-        seeds=cfg["seeds"],
-        levels=cfg["levels"],
-        max_time=cfg["max_time"],
-        max_patients=cfg["max_patients"],
-        source=cfg["source"],
-        max_points=cfg["config"]["max_points"],
-        deterministic=cfg["config"]["deterministic"],
-        progress=progress,
-    )
+    old_iso = os.environ.get("CONSTRAINT_ISOLATION_MODE")
+    if cfg["config"].get("isolation_mode") == "none":
+        os.environ["CONSTRAINT_ISOLATION_MODE"] = "none"
+    try:
+        payload = run_grid(
+            scenarios=cfg["scenarios"],
+            seeds=cfg["seeds"],
+            levels=cfg["levels"],
+            max_time=cfg["max_time"],
+            max_patients=cfg["max_patients"],
+            source=cfg["source"],
+            max_points=cfg["config"]["max_points"],
+            deterministic=cfg["config"]["deterministic"],
+            progress=progress,
+        )
+    finally:
+        if old_iso is None:
+            os.environ.pop("CONSTRAINT_ISOLATION_MODE", None)
+        else:
+            os.environ["CONSTRAINT_ISOLATION_MODE"] = old_iso
 
     out = Path(cfg["out"])
     out.parent.mkdir(parents=True, exist_ok=True)
