@@ -1,0 +1,7 @@
+scenario,pair,jaccard
+scenario_98_seed11,M1_greedy_sofa|M2_greedy_priority,1.0
+scenario_98_seed11,M4_cpsat_ws|M7_rolling,0.624976856330243
+scenario_98_seed22,M1_greedy_sofa|M2_greedy_priority,1.0
+scenario_98_seed22,M4_cpsat_ws|M7_rolling,0.6435005115595941
+scenario_98_seed33,M1_greedy_sofa|M2_greedy_priority,1.0
+scenario_98_seed33,M4_cpsat_ws|M7_rolling,0.6248655543233351

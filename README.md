@@ -68,3 +68,7 @@ $env:PYTHONPATH = (Get-Location)
 ```
 
 线下 dump：**不入 Git**，见 [`docs/DUMP_READY.md`](docs/DUMP_READY.md)。页面：项目 / 运行 / 验收。默认策略 `cp_sat`（无 MIMIC PPO 轨迹时勿宣称 online RL）。
+
+## Independent experiment archive
+
+See [experiments/README.md](experiments/README.md) for the repository-local algorithms, comparison results, reproduction steps and historical limitations.
