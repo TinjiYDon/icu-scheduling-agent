@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import os
 from functools import lru_cache
 from typing import Any
 
@@ -24,8 +23,7 @@ def load_constraint_rules() -> dict[str, Any]:
 
 def needs_isolation(careunit: str | None) -> bool:
     cfg = load_constraint_rules().get("isolation", {})
-    # 允许网格运行器显式切换（用于 S1 正常负载敏感性实验：--isolation-mode none）
-    mode = os.environ.get("CONSTRAINT_ISOLATION_MODE") or str(cfg.get("mode", "careunit_keywords"))
+    mode = str(cfg.get("mode", "careunit_keywords"))
     if mode == "none":
         return False
     keywords = [str(k).lower() for k in cfg.get("keywords", [])]
